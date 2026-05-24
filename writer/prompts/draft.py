@@ -1,16 +1,13 @@
 """
 初稿生成 prompt 与调用。
-
-输入：Topic + outline
-输出：markdown 初稿
 """
 
 from __future__ import annotations
 
 import logging
-import os
 
 from db import Topic
+from writer.llm_client import chat, get_model
 from writer.style_lib_loader import (
     banned_words_block,
     load_style_examples,
@@ -62,21 +59,7 @@ def build_draft_prompt(topic: Topic, outline: str) -> tuple[str, str]:
 
 
 def generate_draft(topic: Topic, outline: str) -> dict:
-    import anthropic
-
-    if not os.getenv("ANTHROPIC_API_KEY"):
-        raise RuntimeError("未设置 ANTHROPIC_API_KEY，请在 .env 中配置")
-
-    model = os.getenv("WRITER_MODEL", "claude-opus-4-7")
     system, user = build_draft_prompt(topic, outline)
-
-    logger.info("[draft] calling Claude (%s) for topic #%s", model, topic.id)
-    client = anthropic.Anthropic()
-    response = client.messages.create(
-        model=model,
-        max_tokens=8192,
-        system=system,
-        messages=[{"role": "user", "content": user}],
-    )
-    text = "".join(b.text for b in response.content if getattr(b, "type", None) == "text").strip()
-    return {"draft": text, "model": model}
+    logger.info("[draft] generate for topic #%s", topic.id)
+    text = chat(system=system, user=user, max_tokens=8192)
+    return {"draft": text, "model": get_model()}
