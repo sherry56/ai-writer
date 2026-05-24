@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.venv/
+venv/
+env/
+
+# 环境变量与密钥
+.env
+.env.local
+
+# 数据
+data/db.sqlite
+data/db.sqlite-journal
+data/articles/*
+!data/articles/.gitkeep
+data/style_lib/*
+!data/style_lib/.gitkeep
+
+# IDE
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# 日志
+*.log
+logs/

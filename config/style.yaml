@@ -1,0 +1,26 @@
+# 风格偏好配置
+# 这里只是 MVP 占位，写作 prompt 会读取以下字段
+tone:
+  - 实用
+  - 不啰嗦
+  - 偶尔玩梗但不油
+
+# 禁用词（让 LLM 输出时避开）
+banned_words:
+  - 赋能
+  - 颠覆
+  - 重磅
+  - 炸裂
+  - 革命性
+  - 划时代
+  - 元年
+
+# 句式偏好
+prefer:
+  - 短句优先
+  - 多用具体数字和例子
+  - 避免排比堆砌
+  - 避免空泛形容词
+
+# few-shot 样本目录（为空时使用 fallback prompt）
+style_lib_dir: data/style_lib

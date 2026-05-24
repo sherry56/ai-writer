@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ai-writer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body class="bg-slate-50 text-slate-800">
+  <div id="app" class="min-h-screen flex flex-col">
+    <header class="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <h1 class="text-xl font-semibold">ai-writer</h1>
+        <span class="text-xs text-slate-500">公众号 AI 写作 · 自定义选题</span>
+      </div>
+      <button id="btn-new" class="bg-slate-900 text-white text-sm px-3 py-1.5 rounded hover:bg-slate-700">+ 新建选题</button>
+    </header>
+
+    <main class="flex-1 flex overflow-hidden">
+      <!-- left: topic list -->
+      <aside class="w-80 border-r border-slate-200 bg-white flex flex-col">
+        <div class="px-4 py-3 border-b border-slate-200 flex gap-1 text-xs">
+          <button data-status="" class="filter-btn active">全部</button>
+          <button data-status="draft" class="filter-btn">草稿</button>
+          <button data-status="writing" class="filter-btn">写作中</button>
+          <button data-status="done" class="filter-btn">已完成</button>
+          <button data-status="discarded" class="filter-btn">放弃</button>
+        </div>
+        <ul id="topic-list" class="flex-1 overflow-y-auto"></ul>
+      </aside>
+
+      <!-- right: editor -->
+      <section id="editor" class="flex-1 overflow-y-auto p-6">
+        <div id="empty-state" class="text-center text-slate-400 mt-24">
+          <p class="text-base">选择左侧选题，或点击右上角「新建选题」开始</p>
+        </div>
+        <div id="editor-body" class="hidden max-w-4xl mx-auto space-y-6"></div>
+      </section>
+    </main>
+
+    <div id="toast" class="fixed bottom-6 right-6 hidden bg-slate-900 text-white text-sm px-4 py-2 rounded shadow-lg"></div>
+  </div>
+
+  <!-- modal: new/edit topic -->
+  <div id="modal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
+    <div class="bg-white rounded-lg shadow-xl w-[520px] max-h-[90vh] flex flex-col">
+      <div class="px-5 py-3 border-b font-medium" id="modal-title">新建选题</div>
+      <div class="p-5 space-y-4 overflow-y-auto">
+        <label class="block">
+          <span class="text-sm text-slate-700">标题</span>
+          <input id="f-title" type="text" class="mt-1 w-full border rounded px-3 py-2 text-sm" placeholder="例如：Claude Opus 4.7 的能力评测" />
+        </label>
+        <label class="block">
+          <span class="text-sm text-slate-700">内容类型</span>
+          <select id="f-type" class="mt-1 w-full border rounded px-3 py-2 text-sm"></select>
+        </label>
+        <label class="block">
+          <span class="text-sm text-slate-700">备注 / 写作角度 / 素材（资料卡作为素材直接写在这里）</span>
+          <textarea id="f-notes" rows="10" class="mt-1 w-full border rounded px-3 py-2 text-sm font-mono" placeholder="可以贴入官方资料、关键数据、要强调的角度。这些内容会作为唯一素材送给模型。"></textarea>
+        </label>
+      </div>
+      <div class="px-5 py-3 border-t flex justify-end gap-2">
+        <button id="modal-cancel" class="px-3 py-1.5 text-sm rounded hover:bg-slate-100">取消</button>
+        <button id="modal-save" class="px-3 py-1.5 text-sm rounded bg-slate-900 text-white hover:bg-slate-700">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
