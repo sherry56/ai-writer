@@ -1,6 +1,6 @@
 # 服务器端使用：从 GHCR 拉取镜像，不在服务器构建。
 # 用法：
-#   IMAGE=ghcr.io/<owner>/ai-writer:latest docker compose -f docker-compose.prod.yml up -d
+#   IMAGE=ghcr.io/sherry56/ai-writer:latest docker compose -f docker-compose.prod.yml up -d
 # 或在 .env 中设置 IMAGE=...
 
 services:

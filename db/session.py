@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from db.models import Base
 
 # 加载 .env（项目根）
-load_dotenv()
+load_dotenv(override=True)
 
 # 数据库 URL 来自 .env，默认 sqlite 文件
 _DEFAULT_DB_URL = "sqlite:///data/db.sqlite"

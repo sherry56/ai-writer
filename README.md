@@ -16,7 +16,7 @@
 - Python 3.11+
 - FastAPI + Uvicorn（后端 + 静态前端托管）
 - SQLite + SQLAlchemy 2.0
-- Anthropic Python SDK（写作模型默认 `claude-opus-4-7`）
+- OpenAI Python SDK（写作模型默认 `gpt-5.5`，也可切换 Anthropic provider）
 - 原生 HTML + Tailwind(CDN) + 原生 JS（无构建步骤）
 - Docker / docker-compose
 
@@ -24,7 +24,7 @@
 
 ```bash
 pip install -r requirements.txt
-cp .env.example .env       # 填入 ANTHROPIC_API_KEY
+cp .env.example .env       # 填入 OPENAI_API_KEY
 uvicorn web.main:app --reload --port 8000
 ```
 
@@ -35,7 +35,7 @@ uvicorn web.main:app --reload --port 8000
 ## Docker 部署
 
 ```bash
-cp .env.example .env       # 填入 ANTHROPIC_API_KEY
+cp .env.example .env       # 填入 OPENAI_API_KEY
 docker compose up -d --build
 ```
 
@@ -45,13 +45,13 @@ docker compose up -d --build
 
 ### 服务器端拉取镜像部署
 
-每次 push 到 `main` 都会通过 GitHub Actions 构建并推送镜像到 `ghcr.io/<owner>/ai-writer:latest`。
+每次 push 到 `main` 都会通过 GitHub Actions 构建并推送镜像到 `ghcr.io/sherry56/ai-writer:latest`。
 服务器上不需要源码,只需要 `.env` + `docker-compose.prod.yml`:
 
 ```bash
-# 首次：拷贝 .env.example 为 .env 并填 ANTHROPIC_API_KEY
+# 首次：拷贝 .env.example 为 .env 并填 OPENAI_API_KEY
 # 然后：
-docker login ghcr.io -u <github-user>       # 私有仓库才需要登录
+docker login ghcr.io -u sherry56            # 私有仓库才需要登录
 docker compose -f docker-compose.prod.yml pull
 docker compose -f docker-compose.prod.yml up -d
 ```

@@ -3,70 +3,216 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ai-writer</title>
+  <title>AI-writer | 公众号写作台</title>
+  <meta name="theme-color" content="#d97706" />
+  <link rel="icon" href="/static/favicon.svg?v=1" type="image/svg+xml" />
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="/static/styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.11/dist/purify.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <link id="hljs-theme" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css" />
+  <link rel="stylesheet" href="/static/styles.css?v=22" />
+  <link rel="stylesheet" href="/static/themes.css?v=20" />
 </head>
-<body class="bg-slate-50 text-slate-800">
-  <div id="app" class="min-h-screen flex flex-col">
-    <header class="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <h1 class="text-xl font-semibold">ai-writer</h1>
-        <span class="text-xs text-slate-500">公众号 AI 写作 · 自定义选题</span>
-      </div>
-      <button id="btn-new" class="bg-slate-900 text-white text-sm px-3 py-1.5 rounded hover:bg-slate-700">+ 新建选题</button>
+<body class="bg-orange-50 text-stone-800">
+  <div id="app" class="h-screen flex flex-col">
+    <header class="bg-white border-b border-amber-200 px-6 py-3 flex items-center justify-between flex-shrink-0">
+      <a href="/" class="brand" aria-label="AI-writer 首页">
+        <span class="brand-copy">
+          <span class="brand-title">AI-writer</span>
+          <span class="brand-subtitle">公众号 AI 写作 · 自定义选题</span>
+        </span>
+      </a>
+      <button type="button" id="btn-new" class="bg-amber-600 text-white text-sm px-3 py-1.5 rounded hover:bg-amber-700">+ 新建选题</button>
     </header>
 
-    <main class="flex-1 flex overflow-hidden">
-      <!-- left: topic list -->
-      <aside class="w-80 border-r border-slate-200 bg-white flex flex-col">
-        <div class="px-4 py-3 border-b border-slate-200 flex gap-1 text-xs">
-          <button data-status="" class="filter-btn active">全部</button>
-          <button data-status="draft" class="filter-btn">草稿</button>
-          <button data-status="writing" class="filter-btn">写作中</button>
-          <button data-status="done" class="filter-btn">已完成</button>
-          <button data-status="discarded" class="filter-btn">放弃</button>
+    <main class="flex-1 flex overflow-hidden min-h-0">
+      <aside class="w-64 border-r border-amber-200 bg-white flex flex-col flex-shrink-0">
+        <div class="px-3 py-2 border-b border-amber-200 flex gap-1 text-xs flex-wrap">
+          <button type="button" data-status="" class="filter-btn active">全部</button>
+          <button type="button" data-status="draft" class="filter-btn">草稿</button>
+          <button type="button" data-status="writing" class="filter-btn">写作中</button>
+          <button type="button" data-status="done" class="filter-btn">已完成</button>
+          <button type="button" data-status="discarded" class="filter-btn">放弃</button>
         </div>
         <ul id="topic-list" class="flex-1 overflow-y-auto"></ul>
       </aside>
 
-      <!-- right: editor -->
-      <section id="editor" class="flex-1 overflow-y-auto p-6">
-        <div id="empty-state" class="text-center text-slate-400 mt-24">
+      <section id="editor" class="w-1/2 overflow-y-auto p-5 border-r border-amber-200 flex-shrink-0">
+        <div id="empty-state" class="text-center text-stone-400 mt-24">
           <p class="text-base">选择左侧选题，或点击右上角「新建选题」开始</p>
         </div>
-        <div id="editor-body" class="hidden max-w-4xl mx-auto space-y-6"></div>
+        <div id="editor-body" class="hidden space-y-4"></div>
+      </section>
+
+      <section id="preview-pane" class="flex-1 overflow-y-auto bg-orange-100/50 min-w-0">
+        <div class="sticky top-0 bg-orange-100/95 backdrop-blur px-4 py-2 border-b border-amber-200 z-10 space-y-2">
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <div class="flex items-center gap-2 text-xs text-stone-600">
+              <span>预览</span>
+              <select id="preview-source" title="预览源" class="border border-amber-200 rounded px-2 py-0.5 text-xs bg-white">
+                <option value="draft">初稿</option>
+                <option value="outline">大纲</option>
+              </select>
+            </div>
+            <div class="flex gap-2">
+              <button type="button" id="btn-copy-html" class="btn btn-primary">复制富文本</button>
+              <button type="button" id="btn-copy-md" class="btn">复制 markdown</button>
+              <button type="button" id="btn-custom-css" class="btn" title="自定义 CSS">⚙ CSS</button>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 text-xs text-stone-600 flex-wrap">
+            <label>主题
+              <select id="theme-select" title="主题" class="ml-1 border border-amber-200 rounded px-2 py-0.5 text-xs bg-white">
+                <option value="default">默认（蓝）</option>
+                <option value="grace">优雅（紫渐变）</option>
+                <option value="simple">极简（黑白）</option>
+                <option value="green">清新（绿）</option>
+              </select>
+            </label>
+            <label>代码
+              <select id="code-theme-select" title="代码高亮主题" class="ml-1 border border-amber-200 rounded px-2 py-0.5 text-xs bg-white">
+                <option value="atom-one-dark">Atom One Dark</option>
+                <option value="atom-one-light">Atom One Light</option>
+                <option value="github">GitHub</option>
+                <option value="github-dark">GitHub Dark</option>
+                <option value="monokai">Monokai</option>
+                <option value="dracula">Dracula</option>
+                <option value="solarized-light">Solarized Light</option>
+              </select>
+            </label>
+            <label>字体
+              <select id="font-select" title="字体" class="ml-1 border border-amber-200 rounded px-2 py-0.5 text-xs bg-white">
+                <option value='-apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", "Microsoft YaHei", sans-serif'>系统</option>
+                <option value='"PingFang SC", "Microsoft YaHei", "WenQuanYi Micro Hei", sans-serif'>黑体</option>
+                <option value='Georgia, "Times New Roman", "STSong", "SimSun", serif'>衬线</option>
+                <option value='ui-monospace, SFMono-Regular, Menlo, "Cascadia Code", monospace'>等宽</option>
+              </select>
+            </label>
+            <label>字号
+              <select id="fontsize-select" title="字号" class="ml-1 border border-amber-200 rounded px-2 py-0.5 text-xs bg-white">
+                <option value="13px">13</option>
+                <option value="14px" selected>14</option>
+                <option value="15px">15</option>
+                <option value="16px">16</option>
+                <option value="17px">17</option>
+                <option value="18px">18</option>
+              </select>
+            </label>
+          </div>
+        </div>
+        <div class="p-5">
+          <div id="preview-content" class="preview-wrap wx-preview theme-default">
+            <p style="color:#a8a29e">左侧选择一篇选题以查看预览。</p>
+          </div>
+        </div>
+
+        <div id="css-modal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
+          <div class="bg-white rounded-lg shadow-xl w-[640px] max-h-[80vh] flex flex-col">
+            <div class="px-5 py-3 border-b border-amber-200 font-medium">自定义 CSS（追加到当前主题之后）</div>
+            <div class="p-5 flex-1 overflow-auto">
+              <textarea id="css-area" title="自定义 CSS" class="w-full h-80 border border-amber-200 rounded px-3 py-2 text-xs font-mono"
+                placeholder=".wx-preview h2 { background: red; }"></textarea>
+              <p class="text-xs text-stone-500 mt-2">选择器以 <code>.wx-preview</code> 为根。保存后立即生效并写入 localStorage。</p>
+            </div>
+            <div class="px-5 py-3 border-t border-amber-200 flex justify-end gap-2">
+              <button type="button" id="css-clear" class="px-3 py-1.5 text-sm rounded hover:bg-orange-50">清空</button>
+              <button type="button" id="css-cancel" class="px-3 py-1.5 text-sm rounded hover:bg-orange-50">取消</button>
+              <button type="button" id="css-save" class="px-3 py-1.5 text-sm rounded bg-amber-600 text-white hover:bg-amber-700">保存</button>
+            </div>
+          </div>
+        </div>
       </section>
     </main>
 
-    <div id="toast" class="fixed bottom-6 right-6 hidden bg-slate-900 text-white text-sm px-4 py-2 rounded shadow-lg"></div>
+    <div id="toast" class="fixed bottom-6 right-6 hidden bg-amber-800 text-white text-sm px-4 py-2 rounded shadow-lg z-50"></div>
   </div>
 
-  <!-- modal: new/edit topic -->
-  <div id="modal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
-    <div class="bg-white rounded-lg shadow-xl w-[520px] max-h-[90vh] flex flex-col">
-      <div class="px-5 py-3 border-b font-medium" id="modal-title">新建选题</div>
-      <div class="p-5 space-y-4 overflow-y-auto">
-        <label class="block">
-          <span class="text-sm text-slate-700">标题</span>
-          <input id="f-title" type="text" class="mt-1 w-full border rounded px-3 py-2 text-sm" placeholder="例如：Claude Opus 4.7 的能力评测" />
-        </label>
-        <label class="block">
-          <span class="text-sm text-slate-700">内容类型</span>
-          <select id="f-type" class="mt-1 w-full border rounded px-3 py-2 text-sm"></select>
-        </label>
-        <label class="block">
-          <span class="text-sm text-slate-700">备注 / 写作角度 / 素材（资料卡作为素材直接写在这里）</span>
-          <textarea id="f-notes" rows="10" class="mt-1 w-full border rounded px-3 py-2 text-sm font-mono" placeholder="可以贴入官方资料、关键数据、要强调的角度。这些内容会作为唯一素材送给模型。"></textarea>
-        </label>
+  <!-- fullscreen draft editor + AI revise -->
+  <div id="draft-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-6">
+    <div class="bg-white rounded-lg shadow-2xl w-full h-full max-w-7xl flex flex-col relative">
+      <div id="modal-progress" class="hidden absolute top-0 left-0 right-0 h-1 overflow-hidden rounded-t-lg z-20">
+        <div class="progress-stripe h-full"></div>
       </div>
-      <div class="px-5 py-3 border-t flex justify-end gap-2">
-        <button id="modal-cancel" class="px-3 py-1.5 text-sm rounded hover:bg-slate-100">取消</button>
-        <button id="modal-save" class="px-3 py-1.5 text-sm rounded bg-slate-900 text-white hover:bg-slate-700">保存</button>
+      <div class="px-5 py-3 border-b border-amber-200 flex items-center justify-between">
+        <div class="font-medium text-amber-800" id="draft-modal-title">编辑初稿</div>
+        <div class="flex gap-2">
+          <button type="button" id="btn-insert-image" class="btn">📷 插入图片</button>
+          <input type="file" id="image-file-input" accept="image/*" class="hidden" />
+          <button type="button" id="draft-modal-save" class="btn btn-primary">保存</button>
+          <button type="button" id="draft-modal-close" class="btn">关闭</button>
+        </div>
+      </div>
+      <div class="flex-1 flex overflow-hidden min-h-0">
+        <aside class="w-64 flex flex-col flex-shrink-0 border-r border-amber-200">
+          <div class="px-3 py-1.5 text-xs text-stone-600 border-b border-amber-200 bg-orange-50 flex items-center justify-between">
+            <span>标题大纲</span>
+            <span class="text-stone-400">点击跳转</span>
+          </div>
+          <ul id="draft-modal-toc" class="flex-1 overflow-y-auto py-2 text-sm"></ul>
+        </aside>
+        <div class="flex-1 flex flex-col border-r border-amber-200 min-w-0">
+          <div class="px-3 py-1.5 text-xs text-stone-600 border-b border-amber-200 bg-orange-50 flex items-center justify-between">
+            <span id="draft-mode-label">初稿 markdown · 支持粘贴图片 / 拖拽图片</span>
+            <div class="flex gap-1">
+              <button type="button" id="btn-mode-md" class="btn mode-btn active">源码</button>
+              <button type="button" id="btn-mode-preview" class="btn mode-btn">预览</button>
+            </div>
+          </div>
+          <textarea id="draft-modal-text" title="初稿" class="flex-1 w-full p-4 font-mono text-sm leading-relaxed resize-none outline-none"></textarea>
+          <div id="draft-modal-preview" class="hidden flex-1 overflow-y-auto p-6 wx-preview theme-default"></div>
+        </div>
+        <aside class="w-96 flex flex-col flex-shrink-0">
+          <div class="px-3 py-1.5 text-xs text-stone-600 border-b border-amber-200 bg-orange-50">AI 修改 · 基于初稿</div>
+          <div class="p-4 space-y-3 overflow-y-auto">
+            <label class="block">
+              <span class="text-xs text-stone-600">修改指令 (自由描述)</span>
+              <textarea id="draft-revise-instr" rows="5" class="mt-1 w-full border border-amber-200 rounded px-3 py-2 text-sm"
+                placeholder="例如:&#10;- 第 3 段太啰嗦,精简到两句话&#10;- 在「能力对比」加一个具体例子&#10;- 把结尾改成更克制的语气"></textarea>
+            </label>
+            <button type="button" id="draft-revise-go" class="btn btn-primary w-full">提交修改 (基于初稿)</button>
+            <p class="text-xs text-stone-400">每次修改会重新落盘一份 .md 备份,旧版本保留。</p>
+
+            <div class="border-t border-amber-200 pt-3">
+              <div class="text-xs text-stone-600 mb-2">快捷指令</div>
+              <div class="space-y-1.5">
+                <button type="button" class="btn w-full text-left quick-instr" data-instr="把全文整体精简 20% ,删掉重复表达和不必要的形容词,保留所有事实点">精简 20%</button>
+                <button type="button" class="btn w-full text-left quick-instr" data-instr="把开头钩子改得更具体:用一个数字或场景直接进入,而不是抽象判断">改写开头钩子</button>
+                <button type="button" class="btn w-full text-left quick-instr" data-instr="按大纲检查每个一级条目是否覆盖到位,补足缺失的论据或例子">按大纲补漏</button>
+                <button type="button" class="btn w-full text-left quick-instr" data-instr="把所有"我们/大家"等含糊主语改成具体角色;主动语态优先">语态收紧</button>
+              </div>
+            </div>
+          </div>
+        </aside>
       </div>
     </div>
   </div>
 
-  <script src="/static/app.js"></script>
+  <!-- new/edit topic modal -->
+  <div id="modal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
+    <div class="bg-white rounded-lg shadow-xl w-[520px] max-h-[90vh] flex flex-col">
+      <div class="px-5 py-3 border-b border-amber-200 font-medium text-amber-800" id="modal-title">新建选题</div>
+      <div class="p-5 space-y-4 overflow-y-auto">
+        <label class="block">
+          <span class="text-sm text-stone-700">标题</span>
+          <input id="f-title" type="text" class="mt-1 w-full border border-amber-200 rounded px-3 py-2 text-sm" placeholder="例如：GPT-5.5 的能力评测" />
+        </label>
+        <label class="block">
+          <span class="text-sm text-stone-700">内容类型</span>
+          <select id="f-type" title="内容类型" class="mt-1 w-full border border-amber-200 rounded px-3 py-2 text-sm"></select>
+        </label>
+        <label class="block">
+          <span class="text-sm text-stone-700">备注 / 写作角度 / 素材（直接写在这里，作为唯一素材送给模型）</span>
+          <textarea id="f-notes" rows="10" class="mt-1 w-full border border-amber-200 rounded px-3 py-2 text-sm font-mono"></textarea>
+        </label>
+      </div>
+      <div class="px-5 py-3 border-t border-amber-200 flex justify-end gap-2">
+        <button type="button" id="modal-cancel" class="px-3 py-1.5 text-sm rounded hover:bg-orange-50">取消</button>
+        <button type="button" id="modal-save" class="px-3 py-1.5 text-sm rounded bg-amber-600 text-white hover:bg-amber-700">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js?v=20"></script>
 </body>
 </html>

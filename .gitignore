@@ -18,6 +18,8 @@ data/db.sqlite
 data/db.sqlite-journal
 data/articles/*
 !data/articles/.gitkeep
+data/uploads/*
+!data/uploads/.gitkeep
 data/style_lib/*
 !data/style_lib/.gitkeep
 

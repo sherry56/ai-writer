@@ -3,8 +3,10 @@
 from writer.prompts import (
     build_draft_prompt,
     build_outline_prompt,
+    build_revise_prompt,
     generate_draft,
     generate_outline,
+    generate_revision,
 )
 from writer.style_lib_loader import (
     StyleConfig,
@@ -27,4 +29,6 @@ __all__ = [
     "generate_outline",
     "build_draft_prompt",
     "generate_draft",
+    "build_revise_prompt",
+    "generate_revision",
 ]

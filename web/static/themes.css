@@ -1,0 +1,140 @@
+/* 多主题样式表（移植自 doocs/md 默认/优雅/简洁三套） */
+
+/* ===== 通用基础 ===== */
+.wx-preview {
+  font-family: var(--wx-font, -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", "Microsoft YaHei", sans-serif);
+  font-size: var(--wx-fontsize, 14px);
+  line-height: 1.75;
+  letter-spacing: 0.05em;
+  word-break: break-word;
+}
+.wx-preview h1,.wx-preview h2,.wx-preview h3,.wx-preview h4,.wx-preview h5,.wx-preview h6 {
+  font-weight: bold; line-height: 1.4; margin: 0;
+  font-size: 16px;
+}
+.wx-preview h1 { font-size: 16px; }
+.wx-preview h2 { font-size: 16px; }
+.wx-preview h3 { font-size: 16px; }
+.wx-preview h4 { font-size: 16px; }
+.wx-preview p { margin: 0.5em 0; text-align: justify; }
+.wx-preview h1 + *,.wx-preview h2 + *,.wx-preview h3 + *,.wx-preview h4 + *,
+.wx-preview h5 + *,.wx-preview h6 + * { margin-top: 1.5em !important; }
+.wx-preview ul,.wx-preview ol { padding-left: 1.5em; margin: 1em 0; }
+.wx-preview li { margin: 0.3em 0; }
+.wx-preview img { max-width: 100%; display: block; margin: 1em auto; border-radius: 4px; }
+.wx-preview hr { border: 0; border-top: 1px dashed #cbd5e1; margin: 1.8em 0; }
+.wx-preview table { border-collapse: collapse; width: 100%; margin: 1em 0; font-size: 0.9em; }
+.wx-preview th,.wx-preview td { border: 1px solid #e2e8f0; padding: 6px 10px; }
+.wx-preview code {
+  padding: 2px 6px; border-radius: 3px; font-size: 0.9em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+/* pre is transparent shell with rounded clip; hljs theme paints background+color on code */
+.wx-preview pre { margin: 1em 0; border-radius: 6px; overflow: hidden; }
+.wx-preview pre code {
+  display: block; padding: 14px 16px; overflow-x: auto;
+  font-size: 0.85em; line-height: 1.5;
+}
+
+/* ===== Theme: default (蓝色清新) ===== */
+.theme-default { color: #444444; }
+.theme-default h1 { font-size: 16px; text-align: center; color: #1a202c; }
+.theme-default h2 {
+  font-size: 16px; color: #ffffff; display: inline-block;
+  background: #2563eb; padding: 4px 14px; border-radius: 4px;
+}
+.theme-default h3 { font-size: 16px; color: #1e40af; border-left: 3px solid #3b82f6; padding-left: 10px; }
+.theme-default h4 { font-size: 16px; color: #1e40af; }
+.theme-default a  { color: #2563eb; text-decoration: none; border-bottom: 1px solid #93c5fd; }
+.theme-default strong { color: #1e40af; }
+.theme-default em { font-style: italic; color: #475569; }
+.theme-default blockquote {
+  border-left: 3px solid #3b82f6; background: #f0f7ff; color: #475569;
+  padding: 10px 14px; margin: 1em 0; font-size: 0.95em; border-radius: 0 4px 4px 0;
+}
+.theme-default blockquote p { margin: 0.3em 0; }
+.theme-default ul li::marker { color: #3b82f6; }
+.theme-default ol li::marker { color: #3b82f6; font-weight: bold; }
+.theme-default :not(pre) > code { background: #f1f5f9; color: #db2777; }
+.theme-default th { background: #f0f7ff; color: #1e40af; font-weight: bold; }
+
+/* ===== Theme: grace (优雅紫渐变，参考 doocs/md grace) ===== */
+.theme-grace { color: #3f3f3f; }
+.theme-grace h1 {
+  font-size: 16px; text-align: center; color: #ffffff;
+  background: linear-gradient(135deg, #7c3aed 0%, #db2777 100%);
+  padding: 12px 16px; border-radius: 8px;
+}
+.theme-grace h2 {
+  font-size: 16px; color: #ffffff; display: inline-block;
+  background: linear-gradient(135deg, #7c3aed 0%, #c026d3 100%);
+  padding: 4px 14px; border-radius: 4px;
+}
+.theme-grace h3 {
+  font-size: 16px; color: #7c3aed;
+  border-left: 4px solid #7c3aed; padding-left: 10px;
+}
+.theme-grace h4 { font-size: 16px; color: #7c3aed; }
+.theme-grace a  { color: #7c3aed; border-bottom: 1px solid #c4b5fd; text-decoration: none; }
+.theme-grace strong { color: #7c3aed; }
+.theme-grace em { font-style: italic; color: #6b7280; }
+.theme-grace blockquote {
+  border-left: 4px solid #c4b5fd; background: #faf5ff; color: #6b21a8;
+  padding: 10px 14px; margin: 1em 0; font-size: 0.95em; border-radius: 0 6px 6px 0;
+}
+.theme-grace blockquote p { margin: 0.3em 0; }
+.theme-grace ul li::marker { color: #7c3aed; }
+.theme-grace ol li::marker { color: #7c3aed; font-weight: bold; }
+.theme-grace :not(pre) > code { background: #faf5ff; color: #c026d3; }
+.theme-grace th { background: #faf5ff; color: #6b21a8; font-weight: bold; }
+
+/* ===== Theme: simple (黑白极简) ===== */
+.theme-simple { color: #2d2d2d; }
+.theme-simple h1 { font-size: 16px; text-align: center; color: #000000; }
+.theme-simple h2 { font-size: 16px; color: #000000; border-bottom: 2px solid #000000; padding-bottom: 4px; }
+.theme-simple h3 { font-size: 16px; color: #000000; }
+.theme-simple h4 { font-size: 16px; color: #000000; }
+.theme-simple a  { color: #000000; border-bottom: 1px solid #000000; text-decoration: none; }
+.theme-simple strong { color: #000000; }
+.theme-simple em { font-style: italic; color: #4b4b4b; }
+.theme-simple blockquote {
+  border-left: 3px solid #2d2d2d; background: #f7f7f7; color: #555555;
+  padding: 10px 14px; margin: 1em 0; font-size: 0.95em;
+}
+.theme-simple blockquote p { margin: 0.3em 0; }
+.theme-simple ul li::marker { color: #2d2d2d; }
+.theme-simple ol li::marker { color: #2d2d2d; font-weight: bold; }
+.theme-simple :not(pre) > code { background: #f1f1f1; color: #c7254e; }
+.theme-simple th { background: #f7f7f7; color: #000000; font-weight: bold; }
+
+/* ===== Theme: green (清新绿) ===== */
+.theme-green { color: #3f3f3f; }
+.theme-green h1 { font-size: 16px; text-align: center; color: #064e3b; }
+.theme-green h2 {
+  font-size: 16px; color: #ffffff; display: inline-block;
+  background: #059669; padding: 4px 14px; border-radius: 4px;
+}
+.theme-green h3 { font-size: 16px; color: #047857; border-left: 3px solid #10b981; padding-left: 10px; }
+.theme-green h4 { font-size: 16px; color: #047857; }
+.theme-green a  { color: #047857; border-bottom: 1px solid #6ee7b7; }
+.theme-green strong { color: #047857; }
+.theme-green em { font-style: italic; color: #4b5563; }
+.theme-green blockquote {
+  border-left: 3px solid #10b981; background: #ecfdf5; color: #065f46;
+  padding: 10px 14px; margin: 1em 0; font-size: 0.95em; border-radius: 0 4px 4px 0;
+}
+.theme-green blockquote p { margin: 0.3em 0; }
+.theme-green ul li::marker { color: #10b981; }
+.theme-green ol li::marker { color: #10b981; font-weight: bold; }
+.theme-green :not(pre) > code { background: #ecfdf5; color: #be185d; }
+.theme-green th { background: #ecfdf5; color: #065f46; }
+
+/* ===== preview container ===== */
+.preview-wrap {
+  background: #ffffff;
+  padding: 24px 28px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  max-width: 720px;
+  margin: 0 auto;
+}

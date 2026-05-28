@@ -1,0 +1,144 @@
+/* 公众号渲染样式（柔和配色，蓝色系，参考 doocs/md 默认主题） */
+
+.wx-preview {
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", "Microsoft YaHei", sans-serif;
+  font-size: 15px;
+  line-height: 1.75;
+  color: #444444;
+  letter-spacing: 0.05em;
+  word-break: break-word;
+}
+
+.wx-preview h1,
+.wx-preview h2,
+.wx-preview h3,
+.wx-preview h4,
+.wx-preview h5,
+.wx-preview h6 {
+  font-weight: bold;
+  line-height: 1.4;
+  margin: 1.6em 0 0.8em;
+}
+
+.wx-preview h1 {
+  font-size: 1.4em;
+  text-align: center;
+  color: #1a202c;
+  margin: 1em 0 1.2em;
+}
+.wx-preview h2 {
+  font-size: 1.2em;
+  color: #2563eb;
+  padding-bottom: 4px;
+  border-bottom: 2px solid #dbeafe;
+}
+.wx-preview h3 {
+  font-size: 1.08em;
+  color: #1e40af;
+  border-left: 3px solid #3b82f6;
+  padding-left: 10px;
+}
+.wx-preview h4 {
+  font-size: 1em;
+  color: #1e40af;
+}
+
+.wx-preview p {
+  margin: 1em 0;
+  text-align: justify;
+}
+
+.wx-preview a {
+  color: #2563eb;
+  text-decoration: none;
+  border-bottom: 1px solid #93c5fd;
+}
+
+.wx-preview strong { color: #1e40af; font-weight: bold; }
+.wx-preview em { font-style: italic; color: #475569; }
+
+.wx-preview blockquote {
+  border-left: 3px solid #3b82f6;
+  background: #f0f7ff;
+  color: #475569;
+  padding: 10px 14px;
+  margin: 1em 0;
+  font-size: 0.95em;
+  border-radius: 0 4px 4px 0;
+}
+.wx-preview blockquote p { margin: 0.3em 0; }
+
+.wx-preview ul,
+.wx-preview ol {
+  padding-left: 1.5em;
+  margin: 1em 0;
+}
+.wx-preview li { margin: 0.3em 0; }
+.wx-preview ul li::marker { color: #3b82f6; }
+.wx-preview ol li::marker { color: #3b82f6; font-weight: bold; }
+
+.wx-preview code {
+  background: #f1f5f9;
+  color: #db2777;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.9em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.wx-preview pre {
+  background: #f8fafc;
+  color: #334155;
+  padding: 14px 16px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  overflow-x: auto;
+  margin: 1em 0;
+  font-size: 0.85em;
+  line-height: 1.5;
+}
+.wx-preview pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  font-size: inherit;
+}
+
+.wx-preview img {
+  max-width: 100%;
+  display: block;
+  margin: 1em auto;
+  border-radius: 4px;
+}
+
+.wx-preview hr {
+  border: 0;
+  border-top: 1px dashed #cbd5e1;
+  margin: 1.8em 0;
+}
+
+.wx-preview table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1em 0;
+  font-size: 0.9em;
+}
+.wx-preview th,
+.wx-preview td {
+  border: 1px solid #e2e8f0;
+  padding: 6px 10px;
+}
+.wx-preview th {
+  background: #f0f7ff;
+  color: #1e40af;
+  font-weight: bold;
+}
+
+.preview-wrap {
+  background: #ffffff;
+  padding: 24px 28px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  max-width: 720px;
+  margin: 0 auto;
+}

@@ -2,8 +2,8 @@
 LLM 调用统一入口。
 
 根据 LLM_PROVIDER 环境变量分发到 Anthropic 或 OpenAI 兼容接口。
+- LLM_PROVIDER=openai     -> openai SDK（默认，支持自定义 base_url）
 - LLM_PROVIDER=anthropic  -> anthropic SDK
-- LLM_PROVIDER=openai     -> openai SDK（支持自定义 base_url，可对接 DeepSeek/Moonshot/Ollama 等）
 """
 
 from __future__ import annotations
@@ -15,11 +15,11 @@ logger = logging.getLogger(__name__)
 
 
 def get_provider() -> str:
-    return os.getenv("LLM_PROVIDER", "anthropic").strip().lower()
+    return os.getenv("LLM_PROVIDER", "openai").strip().lower()
 
 
 def get_model() -> str:
-    return os.getenv("WRITER_MODEL", "claude-opus-4-7")
+    return os.getenv("WRITER_MODEL", "gpt-5.5")
 
 
 def chat(*, system: str, user: str, max_tokens: int = 4096) -> str:

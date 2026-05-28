@@ -11,7 +11,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -27,7 +27,7 @@ from topic_pool import (
     set_status,
     update_topic,
 )
-from writer import TEMPLATES, generate_draft, generate_outline
+from writer import TEMPLATES, generate_draft, generate_outline, generate_revision
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -35,6 +35,8 @@ logger = logging.getLogger(__name__)
 ROOT = Path(__file__).resolve().parent.parent
 ARTICLES_DIR = ROOT / "data" / "articles"
 ARTICLES_DIR.mkdir(parents=True, exist_ok=True)
+UPLOADS_DIR = ROOT / "data" / "uploads"
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 app = FastAPI(title="ai-writer", version="0.2.0")
@@ -64,6 +66,10 @@ class TopicPatch(BaseModel):
 class ArticlePatch(BaseModel):
     outline: Optional[str] = None
     draft: Optional[str] = None
+
+
+class ReviseIn(BaseModel):
+    instruction: str = Field(..., min_length=1, max_length=2000)
 
 
 class TopicOut(BaseModel):
@@ -259,6 +265,26 @@ def api_gen_outline(topic_id: int) -> ArticleOut:
     return _article_out(topic_id)
 
 
+@app.post("/api/topics/{topic_id}/draft/revise", response_model=ArticleOut)
+def api_revise_draft(topic_id: int, payload: ReviseIn) -> ArticleOut:
+    topic = get_topic(topic_id)
+    if topic is None:
+        raise HTTPException(404, "topic not found")
+    art = _article_out(topic_id)
+    if not art.draft:
+        raise HTTPException(400, "当前没有初稿可修改，请先生成初稿")
+    try:
+        result = generate_revision(topic, art.outline or "", art.draft, payload.instruction)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    except Exception as e:  # noqa: BLE001
+        logger.exception("revise failed")
+        raise HTTPException(500, f"修改失败：{e}") from e
+    file_path = _save_draft_file(topic, result["draft"])
+    _upsert_article(topic_id, draft=result["draft"], model=result["model"], file_path=file_path)
+    return _article_out(topic_id)
+
+
 @app.post("/api/topics/{topic_id}/draft", response_model=ArticleOut)
 def api_gen_draft(topic_id: int) -> ArticleOut:
     topic = get_topic(topic_id)
@@ -278,7 +304,30 @@ def api_gen_draft(topic_id: int) -> ArticleOut:
     return _article_out(topic_id)
 
 
+# ===== Uploads =====
+
+ALLOWED_IMAGE_EXT = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp"}
+
+
+@app.post("/api/upload/image")
+async def api_upload_image(file: UploadFile = File(...)) -> dict:
+    name = file.filename or "image"
+    ext = Path(name).suffix.lower()
+    if ext not in ALLOWED_IMAGE_EXT:
+        raise HTTPException(400, f"不支持的图片格式：{ext}")
+    ts = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+    safe = _slug(Path(name).stem) + ext
+    out = UPLOADS_DIR / f"{ts}-{safe}"
+    data = await file.read()
+    out.write_bytes(data)
+    rel = out.relative_to(ROOT).as_posix()
+    logger.info("uploaded image %s (%d bytes)", rel, len(data))
+    return {"url": f"/uploads/{out.name}", "path": rel, "size": len(data)}
+
+
 # ===== Static frontend =====
+
+app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
