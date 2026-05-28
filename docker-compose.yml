@@ -1,13 +1,12 @@
 services:
   ai-writer:
-    build: .
-    image: ai-writer:latest
+    image: ghcr.io/sherry56/ai-writer:latest
     container_name: ai-writer
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "8001:8000"
     env_file:
-      - .env
+      - /home/project/ai-writer/.env
     volumes:
-      - ./data:/app/data
-      - ./config:/app/config
+      - /home/project/ai-writer/data:/app/data
+      - /home/project/ai-writer/config:/app/config

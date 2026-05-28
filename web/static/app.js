@@ -378,11 +378,15 @@ const INLINE_PROPS = [
   "text-indent","line-height","letter-spacing","white-space","word-break",
   "margin-top","margin-bottom","margin-left","margin-right",
   "padding-top","padding-bottom","padding-left","padding-right",
-  "border-top-width","border-right-width","border-bottom-width","border-left-width",
-  "border-top-style","border-right-style","border-bottom-style","border-left-style",
-  "border-top-color","border-right-color","border-bottom-color","border-left-color",
-  "border-radius"
 ];
+
+const BORDER_SIDES = ["top","right","bottom","left"];
+
+function _hasWidth(v) {
+  if (!v) return false;
+  const m = /^([\d.]+)px$/.exec(v.trim());
+  return m ? parseFloat(m[1]) > 0 : false;
+}
 
 function inlineStyles(root) {
   const all = [root, ...root.querySelectorAll("*")];
@@ -395,6 +399,17 @@ function inlineStyles(root) {
         parts.push(`${p}:${v}`);
       }
     }
+    // borders: only emit when width > 0 on that side
+    for (const side of BORDER_SIDES) {
+      const w = cs.getPropertyValue(`border-${side}-width`);
+      if (!_hasWidth(w)) continue;
+      const style = cs.getPropertyValue(`border-${side}-style`);
+      if (!style || style === "none") continue;
+      parts.push(`border-${side}:${w} ${style} ${cs.getPropertyValue(`border-${side}-color`)}`);
+    }
+    const radius = cs.getPropertyValue("border-radius");
+    if (radius && radius !== "0px") parts.push(`border-radius:${radius}`);
+
     el.setAttribute("style", parts.join(";"));
     el.removeAttribute("class");
   });
