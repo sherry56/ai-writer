@@ -419,6 +419,8 @@ async function copyAsRichText() {
   const src = document.getElementById("preview-content");
   if (!src || !src.innerHTML.trim()) { toast("没有可复制的内容"); return; }
   const clone = src.cloneNode(true);
+  const title = clone.querySelector("h1");
+  if (title) title.style.textAlign = "center";
   // wrap so the wx-preview class still applies during getComputedStyle
   const wrapper = document.createElement("div");
   wrapper.className = "wx-preview";
