@@ -404,10 +404,18 @@ function inlineStyles(root) {
         parts.push(`${p}:${v}`);
       }
     }
-    // display: only emit inline-block / flex / inline (skip default block)
+    // display: only emit non-default values (skip default block / inline)
+    const tag = el.tagName?.toLowerCase();
     const dsp = cs.getPropertyValue("display");
-    if (dsp === "inline-block" || dsp === "inline-flex" || dsp === "flex") {
+    if (dsp === "inline-block" || dsp === "inline-flex" || dsp === "flex" || dsp === "table") {
       parts.push(`display:${dsp}`);
+    } else if (dsp === "block" && (tag === "img" || tag === "pre")) {
+      // images/pre need explicit block so WeChat doesn't inline them
+      parts.push(`display:${dsp}`);
+    }
+    if (tag === "img") {
+      parts.push("max-width:100%");
+      parts.push("height:auto");
     }
     // borders: only emit when width > 0 on that side
     for (const side of BORDER_SIDES) {
@@ -453,6 +461,23 @@ async function copyAsRichText() {
   document.body.appendChild(wrapper);
   try {
     inlineStyles(clone);
+    // WeChat strips <code> bg/color; lift them onto <pre> wrapper so the dark/light
+    // code-theme block survives. Wrap in a <section> for extra safety.
+    clone.querySelectorAll("pre").forEach(pre => {
+      const code = pre.querySelector("code");
+      if (!code) return;
+      const codeStyle = code.getAttribute("style") || "";
+      const bg = (/background-color:\s*([^;]+)/.exec(codeStyle) || [])[1];
+      const color = (/(?:^|;)\s*color:\s*([^;]+)/.exec(codeStyle) || [])[1];
+      if (bg) pre.style.backgroundColor = bg.trim();
+      if (color) pre.style.color = color.trim();
+      pre.style.padding = "14px 16px";
+      pre.style.borderRadius = "6px";
+      pre.style.overflowX = "auto";
+      // ensure code is transparent so pre bg shows fully
+      code.style.background = "transparent";
+      code.style.padding = "0";
+    });
     convertToWechatSections(clone);
     // Wrap final HTML in <section data-tool="..."> (mirrors doocs/md output for WeChat)
     const out = document.createElement("section");
