@@ -3,31 +3,47 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AI-writer | 公众号写作台</title>
+  <title>AI-Writer | 公众号写作台</title>
   <meta name="theme-color" content="#d97706" />
   <link rel="icon" href="/static/favicon.svg?v=1" type="image/svg+xml" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.11/dist/purify.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-  <link id="hljs-theme" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" />
-  <link rel="stylesheet" href="/static/styles.css?v=22" />
-  <link rel="stylesheet" href="/static/themes.css?v=25" />
+  <link id="hljs-theme" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
+  <link rel="stylesheet" href="/static/styles.css?v=23" />
+  <link rel="stylesheet" href="/static/themes.css?v=26" />
 </head>
 <body class="bg-orange-50 text-stone-800">
   <div id="app" class="h-screen flex flex-col">
     <header class="bg-white border-b border-amber-200 px-6 py-3 flex items-center justify-between flex-shrink-0">
-      <a href="/" class="brand" aria-label="AI-writer 首页">
+      <a href="/" class="brand" aria-label="AI-Writer 首页">
         <span class="brand-copy">
-          <span class="brand-title">AI-writer</span>
+          <span class="brand-title">AI-Writer</span>
           <span class="brand-subtitle">公众号 AI 写作 · 自定义选题</span>
         </span>
       </a>
-      <button type="button" id="btn-new" class="bg-amber-600 text-white text-sm px-3 py-1.5 rounded hover:bg-amber-700">+ 新建选题</button>
+      <div class="flex items-center gap-3 text-sm">
+        <span id="usage-badge" class="hidden text-stone-600 px-2 py-0.5 rounded bg-orange-100 border border-amber-200 text-xs"></span>
+        <button type="button" id="btn-contact" class="text-amber-700 hover:underline">联系我们</button>
+        <span class="text-stone-300">|</span>
+        <span id="user-badge" class="text-stone-600 hidden">
+          <span class="font-medium" id="user-name"></span>
+          <button type="button" id="btn-logout" class="ml-2 text-amber-700 hover:underline">退出</button>
+        </span>
+        <span id="auth-buttons" class="hidden gap-2 items-center">
+          <button type="button" id="btn-login" class="text-amber-700 hover:underline">登录</button>
+          <span class="text-stone-300">/</span>
+          <button type="button" id="btn-register" class="text-amber-700 hover:underline">注册</button>
+        </span>
+      </div>
     </header>
 
     <main class="flex-1 flex overflow-hidden min-h-0">
       <aside class="w-64 border-r border-amber-200 bg-white flex flex-col flex-shrink-0">
+        <div class="px-3 py-2 border-b border-amber-200">
+          <button type="button" id="btn-new" class="w-full bg-amber-600 text-white text-sm px-3 py-1.5 rounded hover:bg-amber-700">+ 新建选题</button>
+        </div>
         <div class="px-3 py-2 border-b border-amber-200 flex gap-1 text-xs flex-wrap">
           <button type="button" data-status="" class="filter-btn active">全部</button>
           <button type="button" data-status="draft" class="filter-btn">草稿</button>
@@ -40,7 +56,7 @@
 
       <section id="editor" class="w-1/2 overflow-y-auto p-5 border-r border-amber-200 flex-shrink-0">
         <div id="empty-state" class="text-center text-stone-400 mt-24">
-          <p class="text-base">选择左侧选题，或点击右上角「新建选题」开始</p>
+          <p class="text-base">选择左侧选题，或点击「新建选题」开始</p>
         </div>
         <div id="editor-body" class="hidden space-y-4"></div>
       </section>
@@ -72,10 +88,10 @@
             </label>
             <label>代码
               <select id="code-theme-select" title="代码高亮主题" class="ml-1 border border-amber-200 rounded px-2 py-0.5 text-xs bg-white">
-                <option value="github" selected>GitHub</option>
+                <option value="github">GitHub</option>
                 <option value="atom-one-light">Atom One Light</option>
                 <option value="atom-one-dark">Atom One Dark</option>
-                <option value="github-dark">GitHub Dark</option>
+                <option value="github-dark" selected>GitHub Dark</option>
                 <option value="monokai">Monokai</option>
                 <option value="dracula">Dracula</option>
                 <option value="solarized-light">Solarized Light</option>
@@ -125,7 +141,7 @@
       </section>
     </main>
 
-    <div id="toast" class="fixed bottom-6 right-6 hidden bg-amber-800 text-white text-sm px-4 py-2 rounded shadow-lg z-50"></div>
+    <div id="toast" class="fixed bottom-6 right-6 hidden bg-amber-800 text-white text-sm px-4 py-2 rounded shadow-lg z-[9999]"></div>
   </div>
 
   <!-- fullscreen draft editor + AI revise -->
@@ -202,6 +218,10 @@
           <select id="f-type" title="内容类型" class="mt-1 w-full border border-amber-200 rounded px-3 py-2 text-sm"></select>
         </label>
         <label class="block">
+          <span class="text-sm text-stone-700">模型</span>
+          <select id="f-model" title="模型" class="mt-1 w-full border border-amber-200 rounded px-3 py-2 text-sm"></select>
+        </label>
+        <label class="block">
           <span class="text-sm text-stone-700">备注 / 写作角度 / 素材（直接写在这里，作为唯一素材送给模型）</span>
           <textarea id="f-notes" rows="10" class="mt-1 w-full border border-amber-200 rounded px-3 py-2 text-sm font-mono"></textarea>
         </label>
@@ -213,6 +233,42 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=27"></script>
+  <!-- 登录 / 注册 弹窗 -->
+  <div id="auth-modal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
+    <div class="bg-white rounded-lg shadow-xl w-[380px] flex flex-col">
+      <div class="px-5 py-3 border-b border-amber-200 font-medium text-amber-800" id="auth-modal-title">登录</div>
+      <div class="p-5 space-y-3">
+        <label class="block">
+          <span class="text-sm text-stone-700">用户名</span>
+          <input id="auth-user" type="text" autocomplete="username" class="mt-1 w-full border border-amber-200 rounded px-3 py-2 text-sm" />
+        </label>
+        <label class="block">
+          <span class="text-sm text-stone-700">密码</span>
+          <input id="auth-pass" type="password" autocomplete="current-password" class="mt-1 w-full border border-amber-200 rounded px-3 py-2 text-sm" />
+        </label>
+        <p id="auth-err" class="text-xs text-red-600 hidden"></p>
+      </div>
+      <div class="px-5 py-3 border-t border-amber-200 flex justify-end gap-2">
+        <button type="button" id="auth-cancel" class="px-3 py-1.5 text-sm rounded hover:bg-orange-50">取消</button>
+        <button type="button" id="auth-submit" class="px-3 py-1.5 text-sm rounded bg-amber-600 text-white hover:bg-amber-700">登录</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 联系我们 -->
+  <div id="contact-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg shadow-2xl w-[420px] max-h-[90vh] flex flex-col">
+      <div class="px-5 py-3 border-b border-amber-200 flex items-center justify-between">
+        <div class="font-medium text-amber-800" id="contact-title">联系我们</div>
+        <button type="button" id="contact-close" class="text-stone-500 hover:text-stone-800">✕</button>
+      </div>
+      <div class="p-5 flex flex-col items-center gap-3">
+        <img id="contact-image" alt="公众号宣传图" class="w-full max-w-[320px] rounded border border-amber-200" />
+        <p id="contact-subtitle" class="text-xs text-stone-500 text-center"></p>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js?v=37"></script>
 </body>
 </html>

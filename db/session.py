@@ -53,8 +53,18 @@ SessionLocal = sessionmaker(
 
 
 def init_db() -> None:
-    """建表（幂等）。应用启动时调用一次。"""
+    """建表（幂等）。应用启动时调用一次,并对老库自动补 owner 列。"""
     Base.metadata.create_all(bind=engine)
+    # 老库迁移:topics 表加 owner 列
+    if DATABASE_URL.startswith("sqlite"):
+        from sqlalchemy import text
+        with engine.begin() as conn:
+            cols = [r[1] for r in conn.exec_driver_sql("PRAGMA table_info(topics)").fetchall()]
+            if "owner" not in cols:
+                conn.exec_driver_sql("ALTER TABLE topics ADD COLUMN owner VARCHAR(64) NOT NULL DEFAULT 'admin'")
+                conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_topics_owner ON topics(owner)")
+            if "model" not in cols:
+                conn.exec_driver_sql("ALTER TABLE topics ADD COLUMN model VARCHAR(160)")
 
 
 @contextmanager

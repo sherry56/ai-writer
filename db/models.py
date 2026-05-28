@@ -31,6 +31,13 @@ class Base(DeclarativeBase):
 class ContentType(str, enum.Enum):
     TUTORIAL = "tutorial"
     PRODUCT_REVIEW = "product_review"
+    NEWS_ANALYSIS = "news_analysis"
+    INDUSTRY_ANALYSIS = "industry_analysis"
+    TOOL_COMPARISON = "tool_comparison"
+    CASE_STUDY = "case_study"
+    OPINION = "opinion"
+    LISTICLE = "listicle"
+    OTHER = "other"
 
 
 class TopicStatus(str, enum.Enum):
@@ -52,6 +59,8 @@ class Topic(Base):
         String(20), nullable=False, default=TopicStatus.DRAFT.value, index=True
     )
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    owner: Mapped[str] = mapped_column(String(64), nullable=False, default="admin", index=True)
+    model: Mapped[Optional[str]] = mapped_column(String(160), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -83,7 +92,7 @@ class Article(Base):
     outline: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     draft: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     file_path: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    model: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    model: Mapped[Optional[str]] = mapped_column(String(160), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -99,3 +108,16 @@ class Article(Base):
 
     def __repr__(self) -> str:
         return f"<Article id={self.id} topic_id={self.topic_id}>"
+
+
+class UserUsage(Base):
+    """每用户的免费 AI 生成调用计数。"""
+    __tablename__ = "user_usage"
+    username: Mapped[str] = mapped_column(String(64), primary_key=True)
+    count: Mapped[int] = mapped_column(default=0, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    def __repr__(self) -> str:
+        return f"<UserUsage {self.username} count={self.count}>"

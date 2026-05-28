@@ -12,6 +12,8 @@ env/
 # 环境变量与密钥
 .env
 .env.local
+config/users.json
+config/models.json
 
 # 数据
 data/db.sqlite

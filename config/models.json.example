@@ -1,0 +1,46 @@
+{
+  "_comment": "每个模型独立配置 provider/api_key/base_url。复制为 models.json 后填入实际 key。anthropic 模型不需要 base_url。",
+  "default": "gpt-5.5",
+  "models": [
+    {
+      "value": "gpt-5.5",
+      "label": "GPT-5.5",
+      "provider": "openai",
+      "api_key": "sk-xxx",
+      "base_url": "https://api.openai.com/v1"
+    },
+    {
+      "value": "deepseek-chat",
+      "label": "DeepSeek Chat",
+      "provider": "openai",
+      "api_key": "sk-xxx",
+      "base_url": "https://api.deepseek.com/v1"
+    },
+    {
+      "value": "moonshot-v1-32k",
+      "label": "Moonshot Kimi 32K",
+      "provider": "openai",
+      "api_key": "sk-xxx",
+      "base_url": "https://api.moonshot.cn/v1"
+    },
+    {
+      "value": "qwen-max",
+      "label": "Qwen Max",
+      "provider": "openai",
+      "api_key": "sk-xxx",
+      "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    },
+    {
+      "value": "claude-sonnet-4-6",
+      "label": "Claude Sonnet 4.6",
+      "provider": "anthropic",
+      "api_key": "sk-ant-xxx"
+    },
+    {
+      "value": "claude-opus-4-7",
+      "label": "Claude Opus 4.7",
+      "provider": "anthropic",
+      "api_key": "sk-ant-xxx"
+    }
+  ]
+}

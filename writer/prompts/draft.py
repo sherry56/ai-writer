@@ -7,7 +7,7 @@ from __future__ import annotations
 import logging
 
 from db import Topic
-from writer.llm_client import chat, get_model
+from writer.llm_client import chat, resolve_model
 from writer.style_lib_loader import (
     banned_words_block,
     load_style_examples,
@@ -60,6 +60,7 @@ def build_draft_prompt(topic: Topic, outline: str) -> tuple[str, str]:
 
 def generate_draft(topic: Topic, outline: str) -> dict:
     system, user = build_draft_prompt(topic, outline)
+    model = resolve_model(getattr(topic, "model", None))
     logger.info("[draft] generate for topic #%s", topic.id)
-    text = chat(system=system, user=user, max_tokens=8192)
-    return {"draft": text, "model": get_model()}
+    text = chat(system=system, user=user, max_tokens=8192, model=model)
+    return {"draft": text, "model": model}

@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 
 from db import Topic
-from writer.llm_client import chat, get_model
+from writer.llm_client import chat, resolve_model
 from writer.style_lib_loader import (
     banned_words_block,
     load_style_examples,
@@ -71,6 +71,7 @@ def generate_revision(topic: Topic, outline: str, draft: str, instruction: str) 
     if not instruction or not instruction.strip():
         raise ValueError("请填写修改指令")
     system, user = build_revise_prompt(topic, outline or "", draft, instruction.strip())
+    model = resolve_model(getattr(topic, "model", None))
     logger.info("[revise] generate for topic #%s instruction=%r", topic.id, instruction[:60])
-    text = chat(system=system, user=user, max_tokens=8192)
-    return {"draft": text, "model": get_model()}
+    text = chat(system=system, user=user, max_tokens=8192, model=model)
+    return {"draft": text, "model": model}

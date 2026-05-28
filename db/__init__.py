@@ -6,6 +6,7 @@ from db.models import (
     ContentType,
     Topic,
     TopicStatus,
+    UserUsage,
 )
 from db.session import engine, get_session, init_db
 
@@ -15,6 +16,7 @@ __all__ = [
     "Article",
     "ContentType",
     "TopicStatus",
+    "UserUsage",
     "engine",
     "get_session",
     "init_db",

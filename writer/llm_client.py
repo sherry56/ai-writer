@@ -1,46 +1,48 @@
 """
 LLM 调用统一入口。
 
-根据 LLM_PROVIDER 环境变量分发到 Anthropic 或 OpenAI 兼容接口。
-- LLM_PROVIDER=openai     -> openai SDK（默认，支持自定义 base_url）
-- LLM_PROVIDER=anthropic  -> anthropic SDK
+每个模型独立配置 provider / api_key / base_url(见 writer.model_config)。
+调用 chat(model=...) 会按该模型的配置去发起请求。
 """
 
 from __future__ import annotations
 
 import logging
-import os
+
+from writer.model_config import default_model, get_model_config
 
 logger = logging.getLogger(__name__)
 
 
-def get_provider() -> str:
-    return os.getenv("LLM_PROVIDER", "openai").strip().lower()
-
-
 def get_model() -> str:
-    return os.getenv("WRITER_MODEL", "gpt-5.5")
+    return default_model()
 
 
-def chat(*, system: str, user: str, max_tokens: int = 4096) -> str:
-    """统一对话调用。返回纯文本。"""
-    provider = get_provider()
-    model = get_model()
+def resolve_model(model: str | None = None) -> str:
+    value = (model or "").strip()
+    return value or default_model()
+
+
+def chat(*, system: str, user: str, max_tokens: int = 4096, model: str | None = None) -> str:
+    """按所选模型路由到对应 provider + api_key + base_url。返回纯文本。"""
+    cfg = get_model_config(model)
+    provider = (cfg.get("provider") or "openai").lower()
+    target = cfg["value"]
     if provider == "anthropic":
-        return _anthropic_chat(system=system, user=user, max_tokens=max_tokens, model=model)
+        return _anthropic_chat(system=system, user=user, max_tokens=max_tokens, cfg=cfg, model=target)
     if provider == "openai":
-        return _openai_chat(system=system, user=user, max_tokens=max_tokens, model=model)
-    raise ValueError(f"未知 LLM_PROVIDER: {provider}（仅支持 anthropic / openai）")
+        return _openai_chat(system=system, user=user, max_tokens=max_tokens, cfg=cfg, model=target)
+    raise ValueError(f"未知 provider: {provider}(仅支持 anthropic / openai)")
 
 
-def _anthropic_chat(*, system: str, user: str, max_tokens: int, model: str) -> str:
+def _anthropic_chat(*, system: str, user: str, max_tokens: int, cfg: dict, model: str) -> str:
     import anthropic
 
-    if not os.getenv("ANTHROPIC_API_KEY"):
-        raise RuntimeError("未设置 ANTHROPIC_API_KEY")
-
+    api_key = cfg.get("api_key")
+    if not api_key:
+        raise RuntimeError(f"模型 {model} 未配置 api_key")
     logger.info("[llm] anthropic %s", model)
-    client = anthropic.Anthropic()
+    client = anthropic.Anthropic(api_key=api_key)
     resp = client.messages.create(
         model=model,
         max_tokens=max_tokens,
@@ -52,15 +54,14 @@ def _anthropic_chat(*, system: str, user: str, max_tokens: int, model: str) -> s
     ).strip()
 
 
-def _openai_chat(*, system: str, user: str, max_tokens: int, model: str) -> str:
+def _openai_chat(*, system: str, user: str, max_tokens: int, cfg: dict, model: str) -> str:
     from openai import OpenAI
 
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = cfg.get("api_key")
     if not api_key:
-        raise RuntimeError("未设置 OPENAI_API_KEY")
-
-    base_url = os.getenv("OPENAI_BASE_URL") or None  # None -> 默认 OpenAI 官方
-    logger.info("[llm] openai-compatible %s (base_url=%s)", model, base_url or "default")
+        raise RuntimeError(f"模型 {model} 未配置 api_key")
+    base_url = cfg.get("base_url") or None
+    logger.info("[llm] openai-compatible %s base_url=%s", model, base_url or "default")
     client = OpenAI(api_key=api_key, base_url=base_url)
     resp = client.chat.completions.create(
         model=model,

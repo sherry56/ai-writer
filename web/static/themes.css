@@ -132,6 +132,14 @@
 .theme-green :not(pre) > code { background: #ecfdf5; color: #be185d; }
 .theme-green th { background: #ecfdf5; color: #065f46; }
 
+/* Center second-level headings while keeping badge-like backgrounds text-width. */
+.wx-preview h2 {
+  display: table;
+  margin-left: auto;
+  margin-right: auto;
+  text-align: center;
+}
+
 /* ===== preview container ===== */
 .preview-wrap {
   background: #ffffff;

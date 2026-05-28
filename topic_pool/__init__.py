@@ -1,6 +1,7 @@
 """选题池：自定义选题增删改查。"""
 
 from topic_pool.pool_manager import (
+    PUBLIC_OWNER,
     create_topic,
     delete_topic,
     get_topic,
@@ -10,6 +11,7 @@ from topic_pool.pool_manager import (
 )
 
 __all__ = [
+    "PUBLIC_OWNER",
     "list_topics",
     "get_topic",
     "create_topic",

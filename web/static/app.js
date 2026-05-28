@@ -1,16 +1,29 @@
 const api = {
   async req(method, path, body) {
-    const opts = { method, headers: { "Content-Type": "application/json" } };
+    const opts = { method, headers: { "Content-Type": "application/json" }, credentials: "same-origin" };
     if (body !== undefined) opts.body = JSON.stringify(body);
     const r = await fetch(path, opts);
+    if (r.status === 401) {
+      throw Object.assign(new Error("未登录"), { status: 401 });
+    }
     if (!r.ok) {
       let detail = `${r.status}`;
       try { const j = await r.json(); detail = j.detail || JSON.stringify(j); } catch {}
-      throw new Error(detail);
+      if (r.status === 402) {
+        // 免费次数用尽 -> 弹联系我们
+        try { openContactModal(); } catch {}
+      }
+      throw Object.assign(new Error(detail), { status: r.status });
     }
     if (r.status === 204) return null;
     return r.json();
   },
+  me: () => api.req("GET", "/api/me"),
+  login: (username, password) => api.req("POST", "/api/login", { username, password }),
+  register: (username, password) => api.req("POST", "/api/register", { username, password }),
+  logout: () => api.req("POST", "/api/logout"),
+  usage: () => api.req("GET", "/api/usage"),
+  contact: () => api.req("GET", "/api/contact"),
   listTopics: (status) => api.req("GET", "/api/topics" + (status ? `?status=${status}` : "")),
   getTopic: (id) => api.req("GET", `/api/topics/${id}`),
   createTopic: (data) => api.req("POST", "/api/topics", data),
@@ -22,6 +35,7 @@ const api = {
   genDraft: (id) => api.req("POST", `/api/topics/${id}/draft`),
   reviseDraft: (id, instruction) => api.req("POST", `/api/topics/${id}/draft/revise`, { instruction }),
   templates: () => api.req("GET", "/api/templates"),
+  models: () => api.req("GET", "/api/models"),
 };
 
 const LS = {
@@ -30,22 +44,56 @@ const LS = {
   font: "wx.font",
   fontSize: "wx.fontSize",
   customCss: "wx.customCss",
+  hiddenPublic: "wx.hiddenPublicTopics",
 };
 
 const state = {
+  user: null,
+  isAdmin: false,
   filter: "",
   topics: [],
   current: null,
   templates: [],
+  models: [],
   previewSource: "draft",
   theme: localStorage.getItem(LS.theme) || "default",
-  codeTheme: localStorage.getItem(LS.codeTheme) || "github",
+  codeTheme: localStorage.getItem(LS.codeTheme) || "github-dark",
   font: localStorage.getItem(LS.font) || "",
   fontSize: localStorage.getItem(LS.fontSize) || "14px",
   customCss: localStorage.getItem(LS.customCss) || "",
 };
 
 const STATUS_LABEL = { draft: "草稿", writing: "写作中", done: "已完成", discarded: "放弃" };
+const READONLY_PUBLIC_MSG = "公开示例为只读";
+const LOGIN_REQUIRED_MSG = "请先登录后使用写作功能";
+
+function isPublicTopic(topic) {
+  return !!topic?.is_public;
+}
+
+function hiddenPublicKey() {
+  return `${LS.hiddenPublic}.${state.user || "guest"}`;
+}
+
+function hiddenPublicTitles() {
+  try { return JSON.parse(localStorage.getItem(hiddenPublicKey()) || "[]"); }
+  catch { return []; }
+}
+
+function isHiddenPublicTopic(topic) {
+  return state.user && isPublicTopic(topic) && hiddenPublicTitles().includes(topic.title);
+}
+
+function hidePublicTopic(topic) {
+  const titles = new Set(hiddenPublicTitles());
+  titles.add(topic.title);
+  localStorage.setItem(hiddenPublicKey(), JSON.stringify([...titles]));
+}
+
+function requireLoginForAction(message = LOGIN_REQUIRED_MSG) {
+  toast(message);
+  openAuthModal("login");
+}
 
 if (window.marked) {
   marked.setOptions({ gfm: true, breaks: false });
@@ -112,7 +160,13 @@ function applyAllStyling() {
 // ===== topic list =====
 
 async function refreshTopics() {
-  state.topics = await api.listTopics(state.filter);
+  try {
+    const topics = await api.listTopics(state.filter);
+    state.topics = topics.filter(t => !isHiddenPublicTopic(t));
+  } catch (e) {
+    if (e.status === 401) { state.topics = []; }
+    else throw e;
+  }
   renderTopicList();
 }
 
@@ -126,6 +180,7 @@ function renderTopicList() {
     <li class="topic-item ${state.current?.topic.id === t.id ? 'active' : ''}" data-id="${t.id}">
       <div class="title">${escapeHtml(t.title)}</div>
       <div class="meta">
+        ${isPublicTopic(t) ? '<span class="badge public">公开示例</span>' : ''}
         <span class="badge ${t.status}">${STATUS_LABEL[t.status]}</span>
         ${t.has_draft ? '<span>✓ 初稿</span>' : t.has_outline ? '<span>○ 大纲</span>' : ''}
       </div>
@@ -139,6 +194,36 @@ function renderTopicList() {
 function templateLabel(value) {
   const t = state.templates.find(x => x.value === value);
   return t ? t.label : value;
+}
+
+function modelLabel(value) {
+  const t = state.models.find(x => x.value === value);
+  return t ? t.label : value;
+}
+
+function publicTopic() {
+  return state.topics.find(t => isPublicTopic(t));
+}
+
+function setActiveFilter(status) {
+  state.filter = status || "";
+  document.querySelectorAll(".filter-btn").forEach(x => {
+    x.classList.toggle("active", x.dataset.status === state.filter);
+  });
+}
+
+async function openPublicExample() {
+  let t = publicTopic();
+  if (!t) {
+    setActiveFilter("");
+    await refreshTopics();
+    t = publicTopic();
+  }
+  if (!t) {
+    toast("暂无公开示例");
+    return;
+  }
+  await openTopic(t.id);
 }
 
 // ===== editor =====
@@ -163,21 +248,34 @@ function renderEditor() {
   body.classList.remove("hidden");
 
   const { topic, article } = state.current;
+  const isPublic = isPublicTopic(topic);
+  const adminPublic = isPublic && state.isAdmin;
+  const loginPromptOnly = isPublic && !state.user;
+  const readonly = isPublic && !adminPublic;
+  const readonlyAttr = readonly ? "readonly" : "";
+  const writeDisabledAttr = isPublic && state.user && !state.isAdmin ? "disabled" : "";
+  const metaDisabledAttr = isPublic && state.user ? "disabled" : writeDisabledAttr;
+  const readonlyTitle = loginPromptOnly ? LOGIN_REQUIRED_MSG : READONLY_PUBLIC_MSG;
+  const publicTitleAttr = isPublic ? `title="${readonlyTitle}"` : "";
+  const deleteDisabledAttr = isPublic && state.user && !state.isAdmin ? "" : metaDisabledAttr;
+  const deleteTitleAttr = isPublic && state.user && !state.isAdmin
+    ? 'title="从我的列表移除公开示例，不删除共享文件"'
+    : publicTitleAttr;
   body.innerHTML = `
     <div class="section-card">
       <h3>
-        <span>选题</span>
+        <span>选题 ${isPublic ? '<span class="badge public ml-2">公开示例</span>' : ''}</span>
         <div class="flex gap-2">
-          <select id="ed-status" class="text-xs border rounded px-2 py-1">
+          <select id="ed-status" class="text-xs border rounded px-2 py-1" ${metaDisabledAttr} ${publicTitleAttr}>
             ${Object.entries(STATUS_LABEL).map(([v,l]) =>
               `<option value="${v}" ${topic.status===v?'selected':''}>${l}</option>`).join("")}
           </select>
-          <button class="btn" id="btn-edit">编辑</button>
-          <button class="btn" id="btn-delete">删除</button>
+          <button class="btn" id="btn-edit" ${metaDisabledAttr} ${publicTitleAttr}>编辑</button>
+          <button class="btn" id="btn-delete" ${deleteDisabledAttr} ${deleteTitleAttr}>删除</button>
         </div>
       </h3>
       <div class="text-base font-medium text-slate-900">${escapeHtml(topic.title)}</div>
-      <div class="text-xs text-slate-500 mt-1">${templateLabel(topic.content_type)}</div>
+      <div class="text-xs text-slate-500 mt-1">${templateLabel(topic.content_type)} · ${escapeHtml(modelLabel(topic.model))}</div>
       ${topic.notes ? `<details class="mt-2"><summary class="text-xs text-slate-500 cursor-pointer">备注 / 素材</summary>
         <pre class="mt-2 text-xs whitespace-pre-wrap bg-slate-50 p-2 rounded border">${escapeHtml(topic.notes)}</pre>
       </details>` : ''}
@@ -187,30 +285,30 @@ function renderEditor() {
       <h3>
         <span>大纲</span>
         <div class="flex gap-2">
-          <button class="btn btn-primary" id="btn-gen-outline">${article.outline ? '重新生成' : '生成大纲'}</button>
-          <button class="btn" id="btn-save-outline">保存</button>
+          <button class="btn btn-primary" id="btn-gen-outline" ${writeDisabledAttr} ${publicTitleAttr}>${article.outline ? '重新生成' : '生成大纲'}</button>
+          <button class="btn" id="btn-save-outline" ${writeDisabledAttr} ${publicTitleAttr}>保存</button>
         </div>
       </h3>
       <div id="outline-progress" class="generation-progress hidden" role="progressbar" aria-label="大纲生成进度">
         <div class="generation-progress-bar"><div class="progress-stripe"></div></div>
         <div class="generation-progress-label">正在生成大纲...</div>
       </div>
-      <textarea id="ed-outline" placeholder="点击「生成大纲」让 AI 起草，或自己写。" style="min-height:140px">${escapeHtml(article.outline || "")}</textarea>
+      <textarea id="ed-outline" placeholder="点击「生成大纲」让 AI 起草，或自己写。" style="min-height:140px" ${readonlyAttr}>${escapeHtml(article.outline || "")}</textarea>
     </div>
 
     <div class="section-card">
       <h3>
-        <span>初稿 <button type="button" class="btn ml-2" id="btn-expand-draft" title="放大并启用 AI 修改">⛶ 放大编辑</button></span>
+        <span>初稿 <button type="button" class="btn ml-2" id="btn-expand-draft" title="${readonly ? readonlyTitle : '放大并启用 AI 修改'}" ${writeDisabledAttr}>⛶ 放大编辑</button></span>
         <div class="flex gap-2">
-          <button class="btn btn-primary" id="btn-gen-draft">${article.draft ? '重新生成' : '生成初稿'}</button>
-          <button class="btn" id="btn-save-draft">保存</button>
+          <button class="btn btn-primary" id="btn-gen-draft" ${writeDisabledAttr} ${publicTitleAttr}>${article.draft ? '重新生成' : '生成初稿'}</button>
+          <button class="btn" id="btn-save-draft" ${writeDisabledAttr} ${publicTitleAttr}>保存</button>
         </div>
       </h3>
       <div id="draft-progress" class="generation-progress hidden" role="progressbar" aria-label="初稿生成进度">
         <div class="generation-progress-bar"><div class="progress-stripe"></div></div>
         <div class="generation-progress-label">正在生成初稿...</div>
       </div>
-      <textarea id="ed-draft" placeholder="生成初稿前请先有大纲。" style="min-height:320px">${escapeHtml(article.draft || "")}</textarea>
+      <textarea id="ed-draft" placeholder="生成初稿前请先有大纲。" style="min-height:320px" ${readonlyAttr}>${escapeHtml(article.draft || "")}</textarea>
       ${article.file_path ? `<div class="text-xs text-slate-500 mt-2">已落盘：${escapeHtml(article.file_path)}</div>` : ''}
     </div>
   `;
@@ -219,6 +317,17 @@ function renderEditor() {
 
 function bindEditor() {
   const { topic } = state.current;
+
+  if (isPublicTopic(topic) && !state.isAdmin) {
+    if (!state.user) bindLoginPromptControls();
+    else bindPublicUserControls();
+    return;
+  }
+
+  if (!state.user) {
+    bindLoginPromptControls();
+    return;
+  }
 
   document.getElementById("ed-status").addEventListener("change", async (e) => {
     await api.patchTopic(topic.id, { status: e.target.value });
@@ -244,6 +353,7 @@ function bindEditor() {
       const art = await api.genOutline(topic.id);
       state.current.article = art;
       await refreshTopics();
+      await refreshUsageBadge();
       renderEditor();
       updatePreview();
       toast("大纲已生成");
@@ -268,6 +378,7 @@ function bindEditor() {
       const art = await api.genDraft(topic.id);
       state.current.article = art;
       await refreshTopics();
+      await refreshUsageBadge();
       renderEditor();
       updatePreview();
       toast("初稿已生成并落盘");
@@ -295,6 +406,28 @@ function bindEditor() {
   });
   document.getElementById("ed-outline").addEventListener("input", () => {
     if (state.previewSource === "outline") updatePreviewFromEditor();
+  });
+}
+
+function bindLoginPromptControls() {
+  const prompt = () => requireLoginForAction();
+  ["btn-edit", "btn-delete", "btn-gen-outline", "btn-save-outline", "btn-expand-draft", "btn-gen-draft", "btn-save-draft"]
+    .forEach(id => document.getElementById(id)?.addEventListener("click", prompt));
+  document.getElementById("ed-status")?.addEventListener("change", () => {
+    prompt();
+    renderEditor();
+  });
+}
+
+function bindPublicUserControls() {
+  document.getElementById("btn-delete")?.addEventListener("click", async () => {
+    if (!confirm(`从你的列表里移除「${state.current.topic.title}」?`)) return;
+    hidePublicTopic(state.current.topic);
+    state.current = null;
+    await refreshTopics();
+    renderEditor();
+    updatePreview();
+    toast("已从你的列表移除公开示例");
   });
 }
 
@@ -494,7 +627,7 @@ async function copyAsRichText() {
     convertToWechatSections(clone);
     // Wrap final HTML in <section data-tool="..."> (mirrors doocs/md output for WeChat)
     const out = document.createElement("section");
-    out.setAttribute("data-tool", "AI-writer");
+    out.setAttribute("data-tool", "AI-Writer");
     const rootCs = getComputedStyle(src);
     out.setAttribute("style",
       `color:${rootCs.color};font-family:${rootCs.fontFamily};` +
@@ -708,6 +841,7 @@ function closeDraftModal() {
 
 async function saveDraftFromModal() {
   if (!state.current) return;
+  if (isPublicTopic(state.current.topic) && !state.isAdmin) { toast(READONLY_PUBLIC_MSG); return; }
   const { topic } = state.current;
   const draft = document.getElementById("draft-modal-text").value;
   state.current.article = await api.patchArticle(topic.id, { draft });
@@ -731,6 +865,7 @@ function setModalBusy(on) {
 
 async function reviseDraftFromModal(btn) {
   if (!state.current) return;
+  if (isPublicTopic(state.current.topic) && !state.isAdmin) { toast(READONLY_PUBLIC_MSG); return; }
   const { topic } = state.current;
   const instruction = document.getElementById("draft-revise-instr").value.trim();
   if (!instruction) { toast("请填写修改指令"); return; }
@@ -750,6 +885,7 @@ async function reviseDraftFromModal(btn) {
       return;
     }
     state.current.article = art;
+    await refreshUsageBadge();
     // switch back to source mode so user sees the new markdown
     setDraftMode("md");
     document.getElementById("draft-modal-text").value = art.draft;
@@ -779,12 +915,29 @@ async function copyMarkdown() {
 // ===== modal =====
 
 function openModal(topic) {
+  if (isPublicTopic(topic) && !state.isAdmin) {
+    toast(READONLY_PUBLIC_MSG);
+    return;
+  }
+  // require login first
+  if (!document.getElementById("auth-buttons").classList.contains("hidden")) {
+    openAuthModal("login");
+    return;
+  }
   document.getElementById("modal-title").textContent = topic ? "编辑选题" : "新建选题";
   document.getElementById("f-title").value = topic?.title || "";
   document.getElementById("f-notes").value = topic?.notes || "";
   const sel = document.getElementById("f-type");
   sel.innerHTML = state.templates.map(t =>
     `<option value="${t.value}" ${topic?.content_type===t.value?'selected':''}>${t.label}</option>`
+  ).join("");
+  const modelSel = document.getElementById("f-model");
+  const selectedModel = topic?.model || state.models[0]?.value || "";
+  const modelOptions = state.models.some(m => m.value === selectedModel)
+    ? state.models
+    : [{ value: selectedModel, label: selectedModel }, ...state.models];
+  modelSel.innerHTML = modelOptions.map(m =>
+    `<option value="${escapeHtml(m.value)}" ${selectedModel===m.value?'selected':''}>${escapeHtml(m.label)}</option>`
   ).join("");
   document.getElementById("modal").classList.remove("hidden");
   document.getElementById("modal").dataset.editId = topic?.id || "";
@@ -795,17 +948,18 @@ function closeModal() { document.getElementById("modal").classList.add("hidden")
 async function saveModal() {
   const title = document.getElementById("f-title").value.trim();
   const content_type = document.getElementById("f-type").value;
+  const model = document.getElementById("f-model").value;
   const notes = document.getElementById("f-notes").value;
   if (!title) { toast("请填标题"); return; }
   const editId = document.getElementById("modal").dataset.editId;
   try {
     if (editId) {
-      await api.patchTopic(parseInt(editId), { title, content_type, notes });
+      await api.patchTopic(parseInt(editId), { title, content_type, model, notes });
       await refreshTopics();
       await openTopic(parseInt(editId));
       toast("已保存");
     } else {
-      const t = await api.createTopic({ title, content_type, notes });
+      const t = await api.createTopic({ title, content_type, model, notes });
       await refreshTopics();
       await openTopic(t.id);
       toast("已新建");
@@ -816,9 +970,158 @@ async function saveModal() {
 
 // ===== bootstrap =====
 
+async function refreshUsageBadge() {
+  const el = document.getElementById("usage-badge");
+  if (!el) return;
+  if (!state.user) { el.classList.add("hidden"); return; }
+  try {
+    const u = await api.usage();
+    if (u.unlimited) {
+      el.textContent = "无限次";
+      el.className = "text-xs px-2 py-0.5 rounded bg-green-100 border border-green-300 text-green-800";
+    } else {
+      el.textContent = `剩余 ${u.remaining}/${u.limit} 次`;
+      const danger = u.remaining <= 0;
+      el.className = `text-xs px-2 py-0.5 rounded border ${danger ? 'bg-red-50 border-red-200 text-red-700' : 'bg-orange-100 border-amber-200 text-stone-700'}`;
+    }
+    el.classList.remove("hidden");
+  } catch { el.classList.add("hidden"); }
+}
+
+async function openContactModal() {
+  const modal = document.getElementById("contact-modal");
+  try {
+    const c = await api.contact();
+    document.getElementById("contact-title").textContent = c.title || "联系我们";
+    document.getElementById("contact-subtitle").textContent = c.subtitle || "";
+    document.getElementById("contact-image").src = c.image;
+  } catch (e) {
+    toast("加载失败：" + e.message);
+    return;
+  }
+  modal.classList.remove("hidden");
+}
+
+function closeContactModal() {
+  document.getElementById("contact-modal").classList.add("hidden");
+}
+
+function showAuthState(user, isAdmin = false) {
+  state.user = user || null;
+  state.isAdmin = !!isAdmin;
+  const badge = document.getElementById("user-badge");
+  const auth = document.getElementById("auth-buttons");
+  const newBtn = document.getElementById("btn-new");
+  if (user) {
+    document.getElementById("user-name").textContent = user;
+    badge.classList.remove("hidden");
+    auth.classList.add("hidden");
+    auth.classList.remove("flex");
+    if (newBtn) {
+      newBtn.disabled = false;
+      newBtn.textContent = "+ 新建选题";
+    }
+  } else {
+    badge.classList.add("hidden");
+    auth.classList.remove("hidden");
+    auth.classList.add("flex");
+    if (newBtn) {
+      newBtn.disabled = false;
+      newBtn.textContent = "+ 新建选题";
+    }
+  }
+}
+
+async function handlePrimaryTopicButton() {
+  if (state.user) {
+    openModal(null);
+    return;
+  }
+  requireLoginForAction("请先登录后新建选题");
+}
+
+function openAuthModal(mode) {
+  const modal = document.getElementById("auth-modal");
+  document.getElementById("auth-modal-title").textContent = mode === "register" ? "注册" : "登录";
+  document.getElementById("auth-submit").textContent = mode === "register" ? "注册并登录" : "登录";
+  modal.dataset.mode = mode;
+  document.getElementById("auth-user").value = "";
+  document.getElementById("auth-pass").value = "";
+  document.getElementById("auth-err").classList.add("hidden");
+  modal.classList.remove("hidden");
+  document.getElementById("auth-user").focus();
+}
+
+function closeAuthModal() {
+  document.getElementById("auth-modal").classList.add("hidden");
+}
+
+async function submitAuth() {
+  const modal = document.getElementById("auth-modal");
+  const mode = modal.dataset.mode || "login";
+  const u = document.getElementById("auth-user").value.trim();
+  const p = document.getElementById("auth-pass").value;
+  const err = document.getElementById("auth-err");
+  const btn = document.getElementById("auth-submit");
+  err.classList.add("hidden");
+  btn.disabled = true;
+  try {
+    const session = mode === "register" ? await api.register(u, p) : await api.login(u, p);
+    closeAuthModal();
+    showAuthState(session.user, session.is_admin);
+    await refreshTopics();
+    await refreshUsageBadge();
+    if (state.current) await openTopic(state.current.topic.id);
+    toast(mode === "register" ? "注册成功" : "登录成功");
+  } catch (e) {
+    err.textContent = e.message;
+    err.classList.remove("hidden");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 async function init() {
-  state.templates = await api.templates();
-  document.getElementById("btn-new").addEventListener("click", () => openModal(null));
+  // header auth wiring (works whether logged in or not)
+  document.getElementById("btn-login").addEventListener("click", () => openAuthModal("login"));
+  document.getElementById("btn-register").addEventListener("click", () => openAuthModal("register"));
+  document.getElementById("auth-cancel").addEventListener("click", closeAuthModal);
+  document.getElementById("auth-submit").addEventListener("click", submitAuth);
+  document.getElementById("auth-modal").addEventListener("click", (e) => {
+    if (e.target.id === "auth-modal") closeAuthModal();
+  });
+  ["auth-user","auth-pass"].forEach(id => document.getElementById(id).addEventListener("keydown", (e) => {
+    if (e.key === "Enter") submitAuth();
+  }));
+  document.getElementById("btn-logout").addEventListener("click", async () => {
+    await api.logout();
+    state.current = null; state.topics = [];
+    showAuthState(null, false);
+    await refreshTopics();
+    await openPublicExample();
+    await refreshUsageBadge();
+    toast("已退出");
+  });
+
+  document.getElementById("btn-contact").addEventListener("click", openContactModal);
+  document.getElementById("contact-close").addEventListener("click", closeContactModal);
+  document.getElementById("contact-modal").addEventListener("click", (e) => {
+    if (e.target.id === "contact-modal") closeContactModal();
+  });
+
+  // detect current session
+  let me = null;
+  try { me = await api.me(); } catch {}
+  showAuthState(me?.user || null, !!me?.is_admin);
+  await refreshUsageBadge();
+
+  try {
+    [state.templates, state.models] = await Promise.all([api.templates(), api.models()]);
+  } catch {
+    state.templates = [];
+    state.models = [];
+  }
+  document.getElementById("btn-new").addEventListener("click", handlePrimaryTopicButton);
   document.getElementById("modal-cancel").addEventListener("click", closeModal);
   document.getElementById("modal-save").addEventListener("click", saveModal);
   document.getElementById("modal").addEventListener("click", (e) => {
@@ -826,9 +1129,7 @@ async function init() {
   });
   document.querySelectorAll(".filter-btn").forEach(b => {
     b.addEventListener("click", () => {
-      document.querySelectorAll(".filter-btn").forEach(x => x.classList.remove("active"));
-      b.classList.add("active");
-      state.filter = b.dataset.status;
+      setActiveFilter(b.dataset.status);
       refreshTopics();
     });
   });
@@ -911,6 +1212,7 @@ async function init() {
 
   applyAllStyling();
   await refreshTopics();
+  if (!state.current) await openPublicExample();
 }
 
 init().catch(e => toast("初始化失败：" + e.message, 6000));

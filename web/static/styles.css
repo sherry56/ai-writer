@@ -75,6 +75,7 @@
 .badge.writing   { background: #fed7aa; color: #9a3412; }
 .badge.done      { background: #d9f99d; color: #3f6212; }
 .badge.discarded { background: #fecaca; color: #991b1b; }
+.badge.public    { background: #dbeafe; color: #1e40af; }
 
 .section-card {
   background: white;
@@ -103,6 +104,7 @@
   color: #44403c;
 }
 .section-card textarea:focus { outline: 2px solid #fbbf24; outline-offset: -1px; }
+.section-card textarea[readonly] { background: #f8fafc; color: #64748b; }
 
 .btn {
   font-size: 12px;

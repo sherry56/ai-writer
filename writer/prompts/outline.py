@@ -7,7 +7,7 @@ from __future__ import annotations
 import logging
 
 from db import Topic
-from writer.llm_client import chat, get_model
+from writer.llm_client import chat, resolve_model
 from writer.style_lib_loader import (
     banned_words_block,
     load_style_examples,
@@ -56,6 +56,7 @@ def build_outline_prompt(topic: Topic) -> tuple[str, str]:
 
 def generate_outline(topic: Topic) -> dict:
     system, user = build_outline_prompt(topic)
+    model = resolve_model(getattr(topic, "model", None))
     logger.info("[outline] generate for topic #%s", topic.id)
-    text = chat(system=system, user=user, max_tokens=2048)
-    return {"outline": text, "model": get_model()}
+    text = chat(system=system, user=user, max_tokens=2048, model=model)
+    return {"outline": text, "model": model}
