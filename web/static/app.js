@@ -39,7 +39,7 @@ const state = {
   templates: [],
   previewSource: "draft",
   theme: localStorage.getItem(LS.theme) || "default",
-  codeTheme: localStorage.getItem(LS.codeTheme) || "atom-one-dark",
+  codeTheme: localStorage.getItem(LS.codeTheme) || "github",
   font: localStorage.getItem(LS.font) || "",
   fontSize: localStorage.getItem(LS.fontSize) || "14px",
   customCss: localStorage.getItem(LS.customCss) || "",
@@ -373,8 +373,9 @@ function updatePreviewFromEditor() {
 // ===== copy as rich text (inline computed styles, WeChat-friendly) =====
 
 const INLINE_PROPS = [
-  "color","background-color","font-size","font-weight","font-style",
-  "font-family","text-align","text-decoration","text-decoration-color",
+  "color","background-color","background-image","background-size","background-position","background-repeat",
+  "font-size","font-weight","font-style",
+  "font-family","text-align","text-decoration","text-decoration-color","text-shadow",
   "text-indent","line-height","letter-spacing","white-space","word-break",
   "margin-top","margin-bottom","margin-left","margin-right",
   "padding-top","padding-bottom","padding-left","padding-right",
@@ -396,8 +397,17 @@ function inlineStyles(root) {
     for (const p of INLINE_PROPS) {
       const v = cs.getPropertyValue(p);
       if (v && v !== "none" && v !== "auto" && v !== "normal" && v !== "0px" && v.trim()) {
+        // skip background-color when an image (gradient) is present (image wins)
+        if (p === "background-color" && cs.getPropertyValue("background-image") && cs.getPropertyValue("background-image") !== "none") {
+          continue;
+        }
         parts.push(`${p}:${v}`);
       }
+    }
+    // display: only emit inline-block / flex / inline (skip default block)
+    const dsp = cs.getPropertyValue("display");
+    if (dsp === "inline-block" || dsp === "inline-flex" || dsp === "flex") {
+      parts.push(`display:${dsp}`);
     }
     // borders: only emit when width > 0 on that side
     for (const side of BORDER_SIDES) {
@@ -415,24 +425,46 @@ function inlineStyles(root) {
   });
 }
 
+// WeChat editor strips many styles on <p>, but preserves <section> styles wholesale.
+// Convert <p> to <section> (and the root wrapper too) so styles survive paste.
+function convertToWechatSections(root) {
+  root.querySelectorAll("p").forEach(p => {
+    const s = document.createElement("section");
+    for (const a of p.attributes) s.setAttribute(a.name, a.value);
+    while (p.firstChild) s.appendChild(p.firstChild);
+    p.parentNode.replaceChild(s, p);
+  });
+}
+
 async function copyAsRichText() {
   const src = document.getElementById("preview-content");
   if (!src || !src.innerHTML.trim()) { toast("没有可复制的内容"); return; }
   const clone = src.cloneNode(true);
   const title = clone.querySelector("h1");
   if (title) title.style.textAlign = "center";
-  // wrap so the wx-preview class still applies during getComputedStyle
-  const wrapper = document.createElement("div");
-  wrapper.className = "wx-preview";
+  // Stage clone with same wx-preview + current theme so getComputedStyle matches preview cascade
+  const wrapper = document.createElement("section");
+  wrapper.className = `wx-preview theme-${state.theme}`;
   wrapper.style.position = "fixed";
   wrapper.style.left = "-99999px";
   wrapper.style.top = "0";
-  wrapper.style.maxWidth = "720px";
+  wrapper.style.width = "720px";
   wrapper.appendChild(clone);
   document.body.appendChild(wrapper);
   try {
     inlineStyles(clone);
-    const html = clone.outerHTML;
+    convertToWechatSections(clone);
+    // Wrap final HTML in <section data-tool="..."> (mirrors doocs/md output for WeChat)
+    const out = document.createElement("section");
+    out.setAttribute("data-tool", "AI-writer");
+    const rootCs = getComputedStyle(src);
+    out.setAttribute("style",
+      `color:${rootCs.color};font-family:${rootCs.fontFamily};` +
+      `font-size:${rootCs.fontSize};line-height:${rootCs.lineHeight};` +
+      `letter-spacing:${rootCs.letterSpacing};text-align:left;`
+    );
+    while (clone.firstChild) out.appendChild(clone.firstChild);
+    const html = out.outerHTML;
     const text = src.innerText;
     if (window.ClipboardItem && navigator.clipboard?.write) {
       await navigator.clipboard.write([
