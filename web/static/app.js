@@ -480,7 +480,7 @@ async function copyAsRichText() {
     });
     // Center headings (h1/h2) that have a background — wrap each in a section with text-align:center.
     // Use inline-block on the heading so its bg shrinks to text width.
-    clone.querySelectorAll("h1, h2, h3").forEach(h => {
+    clone.querySelectorAll("h1, h2").forEach(h => {
       const sty = h.getAttribute("style") || "";
       const hasBg = /background-color\s*:\s*rgb|background-image\s*:\s*(?:linear|radial)/.test(sty);
       if (!hasBg) return;
