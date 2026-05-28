@@ -184,7 +184,7 @@ def api_list_topics(status: Optional[TopicStatus] = None) -> list[TopicOut]:
     with get_session() as s:
         stmt = select(Topic).options(selectinload(Topic.article))
         if status is not None:
-            stmt = stmt.where(Topic.status == status)
+            stmt = stmt.where(Topic.status == status.value)
         stmt = stmt.order_by(Topic.updated_at.desc())
         topics = list(s.execute(stmt).scalars().all())
         return [TopicOut.from_orm_with_article(t) for t in topics]

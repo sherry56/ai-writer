@@ -46,10 +46,10 @@ class Topic(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     content_type: Mapped[ContentType] = mapped_column(
-        String(30), nullable=False, default=ContentType.PRODUCT_REVIEW
+        String(30), nullable=False, default=ContentType.PRODUCT_REVIEW.value
     )
     status: Mapped[TopicStatus] = mapped_column(
-        String(20), nullable=False, default=TopicStatus.DRAFT, index=True
+        String(20), nullable=False, default=TopicStatus.DRAFT.value, index=True
     )
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 

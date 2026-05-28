@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import logging
+from enum import Enum
 from typing import Optional
 
 from sqlalchemy import select
@@ -14,6 +15,10 @@ from db import ContentType, Topic, TopicStatus, get_session
 logger = logging.getLogger(__name__)
 
 
+def _db_value(value):
+    return value.value if isinstance(value, Enum) else value
+
+
 def list_topics(
     status: Optional[TopicStatus] = None,
     limit: int = 200,
@@ -21,7 +26,7 @@ def list_topics(
     with get_session() as s:
         stmt = select(Topic)
         if status is not None:
-            stmt = stmt.where(Topic.status == status)
+            stmt = stmt.where(Topic.status == _db_value(status))
         stmt = stmt.order_by(Topic.updated_at.desc()).limit(limit)
         return list(s.execute(stmt).scalars().all())
 
@@ -41,9 +46,9 @@ def create_topic(
     with get_session() as s:
         topic = Topic(
             title=title.strip(),
-            content_type=content_type,
+            content_type=_db_value(content_type),
             notes=notes,
-            status=status,
+            status=_db_value(status),
         )
         s.add(topic)
         s.flush()
@@ -62,6 +67,8 @@ def update_topic(topic_id: int, **fields) -> Optional[Topic]:
         if topic is None:
             return None
         for k, v in fields.items():
+            if k == "content_type":
+                v = _db_value(v)
             setattr(topic, k, v)
         return topic
 
@@ -71,7 +78,7 @@ def set_status(topic_id: int, status: TopicStatus) -> Optional[Topic]:
         topic = s.get(Topic, topic_id)
         if topic is None:
             return None
-        topic.status = status
+        topic.status = _db_value(status)
         logger.info("set_status id=%s -> %s", topic_id, status)
         return topic
 

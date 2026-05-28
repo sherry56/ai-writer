@@ -43,6 +43,40 @@ docker compose up -d --build
 
 如需放到反代后面（Nginx / Caddy）, 直接代理到 `http://127.0.0.1:8000` 即可,无 WebSocket 依赖。
 
+### 数据迁移与上传图片
+
+镜像只包含代码,不会包含本地运行数据。`data/db.sqlite`、`data/articles/`、`data/uploads/`、`data/style_lib/` 都需要通过服务器宿主机目录持久化或单独迁移。
+
+本机已有数据迁到服务器示例:
+
+```bash
+# 本机项目目录
+tar -czf ai-writer-data.tgz data
+scp ai-writer-data.tgz user@server:/home/project/ai-writer/
+
+# 服务器
+cd /home/project/ai-writer
+docker compose down
+mkdir -p data/articles data/uploads data/style_lib config
+tar -xzf ai-writer-data.tgz
+docker compose pull
+docker compose up -d --force-recreate
+```
+
+上传图片会写入容器内 `/app/data/uploads`,也就是宿主机挂载目录的 `data/uploads`。前端 markdown 使用 `/uploads/<文件名>` 显示图片。
+
+如果图片上传成功但页面不显示:
+
+```bash
+# 服务器上确认文件确实落到宿主机 volume
+ls -lah /home/project/ai-writer/data/uploads
+
+# 如果 compose 映射为 "8001:8000",这里就测 8001
+curl -I http://127.0.0.1:8001/uploads/<文件名>
+```
+
+如果前面 `curl` 是 200,但公网页面不显示,检查反向代理是否把 `/uploads/` 也代理到应用。最简单配置是把整个站点代理到容器端口,而不是只代理 `/api` 或 `/static`。
+
 ### 服务器端拉取镜像部署
 
 每次 push 到 `main` 都会通过 GitHub Actions 构建并推送镜像到 `ghcr.io/sherry56/ai-writer:latest`。

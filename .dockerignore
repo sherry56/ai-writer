@@ -8,6 +8,10 @@ __pycache__
 data/db.sqlite
 data/articles/*
 !data/articles/.gitkeep
+data/uploads/*
+!data/uploads/.gitkeep
+data/style_lib/*
+!data/style_lib/.gitkeep
 .idea
 .vscode
 *.md

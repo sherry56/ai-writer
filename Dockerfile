@@ -11,7 +11,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN mkdir -p /app/data/articles /app/data/style_lib
+RUN mkdir -p /app/data/articles /app/data/uploads /app/data/style_lib
 
 EXPOSE 8000
 
