@@ -110,6 +110,26 @@ class Article(Base):
         return f"<Article id={self.id} topic_id={self.topic_id}>"
 
 
+class ArticleRevision(Base):
+    """每次 AI 生成/修改后保留一个快照,用于查看历史版本。"""
+    __tablename__ = "article_revisions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    topic_id: Mapped[int] = mapped_column(
+        ForeignKey("topics.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    draft: Mapped[str] = mapped_column(Text, nullable=False)
+    model: Mapped[Optional[str]] = mapped_column(String(160), nullable=True)
+    source: Mapped[str] = mapped_column(String(32), nullable=False, default="draft")  # draft / revise / manual
+    note: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )
+
+    def __repr__(self) -> str:
+        return f"<ArticleRevision id={self.id} topic_id={self.topic_id} source={self.source}>"
+
+
 class UserUsage(Base):
     """每用户的免费 AI 生成调用计数。"""
     __tablename__ = "user_usage"

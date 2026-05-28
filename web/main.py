@@ -1,4 +1,4 @@
-"""FastAPI 后端 + 登录认证 + 用户数据隔离。"""
+"""FastAPI 后端 + 登录认证 + 用户独立 SQLite。"""
 
 from __future__ import annotations
 
@@ -17,7 +17,16 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from starlette.middleware.sessions import SessionMiddleware
 
-from db import Article, ContentType, Topic, TopicStatus, get_session, init_db
+from db import (
+    Article,
+    ArticleRevision,
+    ContentType,
+    PUBLIC_SCOPE,
+    Topic,
+    TopicStatus,
+    get_session,
+    init_db,
+)
 from topic_pool import (
     PUBLIC_OWNER,
     create_topic,
@@ -57,36 +66,31 @@ PUBLIC_EXAMPLE_OLD_TITLES = tuple(
 )
 PUBLIC_EXAMPLE_MODEL = "seed/readme"
 ADMIN_USER = os.getenv("ADMIN_USER", "sherry").strip() or "sherry"
-MODEL_OPTIONS = [
-    {"value": "gpt-5.5", "label": "GPT-5.5"},
-    {"value": "claude-sonnet-4-6", "label": "Claude Sonnet 4.6"},
-    {"value": "gemini-2.5-pro", "label": "Gemini 2.5 Pro"},
-    {"value": "deepseek-v4-pro", "label": "Deepseek-v4-pro"},
-    {"value": "qwen-max", "label": "Qwen Max"},
-    {"value": "moonshot-v1-32k", "label": "Moonshot Kimi 32K"},
-    {"value": "glm-4-plus", "label": "GLM-4 Plus"},
-    {"value": "doubao-seed-1.6", "label": "豆包 Seed 1.6"},
-]
 
-app = FastAPI(title="ai-writer", version="0.3.0")
+
+def is_admin_user(user: Optional[str]) -> bool:
+    return bool(user and user == ADMIN_USER)
+
+
+def require_admin(user: str = Depends(require_user)) -> str:
+    if not is_admin_user(user):
+        raise HTTPException(403, "需要管理员权限")
+    return user
+
+
+app = FastAPI(title="ai-writer", version="0.4.0")
 
 app.add_middleware(
     SessionMiddleware,
     secret_key=get_session_secret(),
     session_cookie=SESSION_COOKIE,
     same_site="lax",
-    https_only=False,  # set True if always served via HTTPS
-    max_age=60 * 60 * 24 * 30,  # 30 days
+    https_only=False,
+    max_age=60 * 60 * 24 * 30,
 )
 
 
-def _read_readme_for_example() -> str:
-    try:
-        return (ROOT / "README.md").read_text(encoding="utf-8").strip()
-    except Exception as e:  # noqa: BLE001
-        logger.warning("read README.md for public example failed: %s", e)
-        return "AI-Writer 是一个面向中文公众号的 AI 写作、预览与排版工具。"
-
+# ===== misc helpers =====
 
 def _model_options() -> list[dict]:
     from writer.model_config import default_model, list_models
@@ -104,109 +108,28 @@ def _topic_model(model: Optional[str]) -> str:
     return value or get_model()
 
 
-def is_admin_user(user: Optional[str]) -> bool:
-    return bool(user and user == ADMIN_USER)
+def _slug(text: str, max_len: int = 40) -> str:
+    text = re.sub(r"[\\/:*?\"<>|\s]+", "-", text).strip("-")
+    return text[:max_len] or "untitled"
 
 
-def _public_example_outline() -> str:
-    return """## 1. 开头定位
-- 用一句话说明 AI-Writer 解决什么问题：把公众号文章从选题、生成、预览到复制排版串起来。
-
-## 2. 功能速览
-- 用表格展示选题池、AI 生成、Markdown 预览、富文本复制、图片上传等能力。
-
-## 3. 实操流程
-- 用分步骤说明从新建选题到复制到公众号编辑器的完整链路。
-
-## 4. 技术示例
-- 放一个启动命令代码块和一个 API payload 代码块，展示代码排版效果。
-
-## 5. 适用场景和限制
-- 说明适合谁、不适合谁，并用分割线做段落收束。"""
-
-
-def _public_example_draft(readme: str) -> str:
-    return """## 一句话定位
-
-AI-Writer 是一个面向中文公众号作者的写作排版工具：你给标题、备注和素材，它帮你生成大纲、生成初稿，并在右侧实时预览公众号样式。
-
-> 更准确地说，它不是“自动替你思考一切”的内容机器，而是一个把写作链路整理顺手的工作台。
-
----
-
-## 功能速览
-
-| 模块 | 解决的问题 | 适合展示的排版 |
-| --- | --- | --- |
-| 选题池 | 管理标题、素材、状态和模型 | 列表、标签、状态 |
-| AI 大纲 | 把零散素材组织成结构 | 二级标题、项目符号 |
-| AI 初稿 | 基于大纲生成公众号草稿 | 段落、引用、重点句 |
-| 右侧预览 | 边写边看排版效果 | 主题、字体、代码高亮 |
-| 富文本复制 | 粘贴到公众号编辑器 | 表格、分割线、代码块 |
-
----
-
-## 一个典型流程
-
-1. 新建选题，写清楚标题、内容类型和模型。
-2. 把写作角度、参考资料、产品信息直接放进备注。
-3. 先生成大纲，人工调整结构。
-4. 再生成初稿，必要时用 AI 修改局部段落。
-5. 在右侧检查公众号样式，最后复制富文本。
-
-这套流程的重点不是“少点几次按钮”，而是让每一步都有明确位置：素材放哪里、结构在哪里改、正文在哪里预览，都不用来回切工具。
-
-## 代码块展示：本地启动
-
-```bash
-pip install -r requirements.txt
-uvicorn web.main:app --reload --port 8000
-```
-
-如果用 Docker，也可以这样启动：
-
-```bash
-docker compose up -d --build
-```
-
-## 代码块展示：创建选题 payload
-
-```json
-{
-  "title": "AI-Writer——一键公众号写作排版工具",
-  "content_type": "tutorial",
-  "model": "按前端模型下拉手动选择",
-  "notes": "目标读者：公众号作者。重点展示表格、代码块、分割线和富文本复制。"
-}
-```
-
-## 为什么要把排版放进写作流程
-
-很多文章不是写完才需要排版。标题层级、段落长度、表格宽度、代码块背景，这些都会反过来影响正文怎么写。
-
-比如技术教程里，代码块如果默认是浅色背景，在公众号里很容易和正文混成一片；黑色背景会更像一个独立的“操作区”，读者扫一眼就知道这里可以复制命令。
-
----
-
-## 适合谁
-
-- 经常写 AI、工具、教程、产品解读的公众号作者。
-- 需要把 Markdown 内容粘贴到公众号编辑器的人。
-- 希望本地部署、数据自己保存的小团队。
-
-## 暂时不适合谁
-
-- 想自动抓热点、自动洗稿的人。
-- 不愿意提供素材，只想让模型凭空编内容的人。
-- 需要复杂协作审批、定时发布的大型团队。
-
----
-
-## 小结
-
-AI-Writer 的价值不在于替作者“无中生有”，而在于把公众号写作里那些重复、割裂、容易丢格式的步骤放到同一个界面里。
-
-当选题、大纲、初稿、预览和复制都在一个工作台完成，写作者能把注意力放回内容本身。"""
+def _outline_from_draft(draft: str) -> str:
+    lines: list[str] = []
+    in_code = False
+    for raw in draft.splitlines():
+        stripped = raw.strip()
+        if stripped.startswith("```"):
+            in_code = not in_code
+            continue
+        if in_code:
+            continue
+        m = re.match(r"^(#{2,3})\s+(.+?)\s*#*\s*$", stripped)
+        if not m:
+            continue
+        level = len(m.group(1))
+        indent = "  " * (level - 2)
+        lines.append(f"{indent}- {m.group(2)}")
+    return "\n".join(lines) or "（参考正文结构）"
 
 
 def _write_public_example_file(draft: str) -> str:
@@ -217,7 +140,7 @@ def _write_public_example_file(draft: str) -> str:
     return path.relative_to(ROOT).as_posix()
 
 
-def _read_public_example_file(default_draft: str) -> tuple[str, str]:
+def _read_public_example_file() -> tuple[Optional[str], Optional[str]]:
     public_dir = ARTICLES_DIR / "public"
     public_dir.mkdir(parents=True, exist_ok=True)
     path = public_dir / f"{PUBLIC_EXAMPLE_TITLE}.md"
@@ -228,9 +151,7 @@ def _read_public_example_file(default_draft: str) -> tuple[str, str]:
                 old_path.replace(path)
                 break
     if not path.exists():
-        file_path = _write_public_example_file(default_draft)
-        return default_draft, file_path
-
+        return None, None
     text = path.read_text(encoding="utf-8").strip()
     prefix = f"# {PUBLIC_EXAMPLE_TITLE}\n\n"
     draft = text[len(prefix):].strip() if text.startswith(prefix) else text
@@ -238,15 +159,17 @@ def _read_public_example_file(default_draft: str) -> tuple[str, str]:
 
 
 def _seed_public_example() -> None:
-    readme = _read_readme_for_example()
-    notes = f"公开示例素材来源：README.md\n\n{readme}"
-    outline = _public_example_outline()
-    draft, file_path = _read_public_example_file(_public_example_draft(readme))
+    draft, file_path = _read_public_example_file()
+    if not draft:
+        logger.info("public example .md missing, skip seeding")
+        return
+    outline = _outline_from_draft(draft)
+    notes = "公开示例素材来源：data/articles/public/" + f"{PUBLIC_EXAMPLE_TITLE}.md"
+    titles = (PUBLIC_EXAMPLE_TITLE, *PUBLIC_EXAMPLE_OLD_TITLES)
 
-    with get_session() as s:
-        titles = (PUBLIC_EXAMPLE_TITLE, *PUBLIC_EXAMPLE_OLD_TITLES)
+    with get_session(PUBLIC_SCOPE) as s:
         topic = s.execute(
-            select(Topic).where(Topic.owner == PUBLIC_OWNER, Topic.title.in_(titles))
+            select(Topic).where(Topic.title.in_(titles))
         ).scalar_one_or_none()
         if topic is None:
             topic = Topic(
@@ -265,6 +188,7 @@ def _seed_public_example() -> None:
             topic.status = TopicStatus.DONE.value
             topic.notes = notes
             topic.model = topic.model or get_model()
+            topic.owner = PUBLIC_OWNER
 
         art = s.execute(select(Article).where(Article.topic_id == topic.id)).scalar_one_or_none()
         if art is None:
@@ -274,14 +198,14 @@ def _seed_public_example() -> None:
         art.draft = draft
         art.model = PUBLIC_EXAMPLE_MODEL
         art.file_path = file_path
-        logger.info("public example ready: topic_id=%s", topic.id)
+        logger.info("public example synced -> topic_id=%s", topic.id)
 
 
 @app.on_event("startup")
 def _startup() -> None:
     init_db()
     _seed_public_example()
-    logger.info("ai-writer started, db ready")
+    logger.info("ai-writer started")
 
 
 # ===== Schemas =====
@@ -329,7 +253,7 @@ class TopicOut(BaseModel):
     has_draft: bool = False
 
     @classmethod
-    def from_orm_with_article(cls, t: Topic) -> "TopicOut":
+    def from_orm_with_article(cls, t: Topic, *, is_public: bool) -> "TopicOut":
         art = t.__dict__.get("article")
         return cls(
             id=t.id,
@@ -338,7 +262,7 @@ class TopicOut(BaseModel):
             status=t.status,
             notes=t.notes,
             model=_topic_model(t.model),
-            is_public=t.owner == PUBLIC_OWNER,
+            is_public=is_public,
             created_at=t.created_at,
             updated_at=t.updated_at,
             has_outline=bool(art and art.outline),
@@ -354,13 +278,35 @@ class ArticleOut(BaseModel):
     model: Optional[str]
 
 
-# ===== Helpers =====
+# ===== scope helpers =====
 
-def _article_out(topic_id: int) -> ArticleOut:
-    with get_session() as s:
-        art = s.execute(
-            select(Article).where(Article.topic_id == topic_id)
-        ).scalar_one_or_none()
+def _scope_for(user: Optional[str], public: bool) -> str:
+    """请求作用域:公开示例 → _public,否则 → 当前用户(必须登录)。"""
+    if public:
+        return PUBLIC_SCOPE
+    if not user:
+        raise HTTPException(401, "未登录")
+    return user
+
+
+def _require_write_perm(scope: str, user: Optional[str]) -> None:
+    """公开示例只允许管理员写。"""
+    if scope == PUBLIC_SCOPE and not is_admin_user(user):
+        raise HTTPException(403, "公开示例仅管理员可修改")
+
+
+def _load_topic(scope: str, topic_id: int) -> Topic:
+    with get_session(scope) as s:
+        stmt = select(Topic).options(selectinload(Topic.article)).where(Topic.id == topic_id)
+        t = s.execute(stmt).scalar_one_or_none()
+        if t is None:
+            raise HTTPException(404, "topic not found")
+        return t
+
+
+def _article_out(scope: str, topic_id: int) -> ArticleOut:
+    with get_session(scope) as s:
+        art = s.execute(select(Article).where(Article.topic_id == topic_id)).scalar_one_or_none()
         if art is None:
             return ArticleOut(topic_id=topic_id, outline=None, draft=None, file_path=None, model=None)
         return ArticleOut(
@@ -372,13 +318,13 @@ def _article_out(topic_id: int) -> ArticleOut:
         )
 
 
-def _upsert_article(topic_id: int, *, outline: Optional[str] = None,
-                    draft: Optional[str] = None, model: Optional[str] = None,
-                    file_path: Optional[str] = None) -> Article:
-    with get_session() as s:
-        art = s.execute(
-            select(Article).where(Article.topic_id == topic_id)
-        ).scalar_one_or_none()
+def _upsert_article(scope: str, topic_id: int, *,
+                    outline: Optional[str] = None,
+                    draft: Optional[str] = None,
+                    model: Optional[str] = None,
+                    file_path: Optional[str] = None) -> None:
+    with get_session(scope) as s:
+        art = s.execute(select(Article).where(Article.topic_id == topic_id)).scalar_one_or_none()
         if art is None:
             art = Article(topic_id=topic_id)
             s.add(art)
@@ -391,70 +337,30 @@ def _upsert_article(topic_id: int, *, outline: Optional[str] = None,
         if file_path is not None:
             art.file_path = file_path
         s.flush()
-        return art
 
 
-def _slug(text: str, max_len: int = 40) -> str:
-    text = re.sub(r"[\\/:*?\"<>|\s]+", "-", text).strip("-")
-    return text[:max_len] or "untitled"
+def _snapshot_revision(scope: str, topic_id: int, draft: str, *,
+                       model: Optional[str], source: str,
+                       note: Optional[str] = None) -> None:
+    if not draft or not draft.strip():
+        return
+    with get_session(scope) as s:
+        s.add(ArticleRevision(
+            topic_id=topic_id, draft=draft, model=model, source=source, note=note,
+        ))
 
 
-def _save_draft_file(topic: Topic, draft: str, owner: str) -> str:
-    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-    name = f"{ts}-{_slug(topic.title)}.md"
-    user_dir = ARTICLES_DIR / _slug(owner, 32)
+def _save_draft_file(scope: str, topic: Topic, draft: str) -> str:
+    folder_name = "public" if scope == PUBLIC_SCOPE else _slug(scope, 32)
+    user_dir = ARTICLES_DIR / folder_name
     user_dir.mkdir(parents=True, exist_ok=True)
-    path = user_dir / name
+    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+    path = user_dir / f"{ts}-{_slug(topic.title)}.md"
     path.write_text(f"# {topic.title}\n\n{draft}\n", encoding="utf-8")
-    rel = path.relative_to(ROOT).as_posix()
-    logger.info("saved draft to %s", rel)
-    return rel
+    return path.relative_to(ROOT).as_posix()
 
 
-def _load_topic_owned(topic_id: int, owner: str) -> Optional[Topic]:
-    with get_session() as s:
-        stmt = (
-            select(Topic)
-            .options(selectinload(Topic.article))
-            .where(Topic.id == topic_id, Topic.owner == owner)
-        )
-        return s.execute(stmt).scalar_one_or_none()
-
-
-def _load_topic_visible(topic_id: int, owner: Optional[str]) -> Optional[Topic]:
-    owners = [PUBLIC_OWNER]
-    if owner:
-        owners.append(owner)
-    with get_session() as s:
-        stmt = (
-            select(Topic)
-            .options(selectinload(Topic.article))
-            .where(Topic.id == topic_id, Topic.owner.in_(owners))
-        )
-        return s.execute(stmt).scalar_one_or_none()
-
-
-def _load_topic_writable(topic_id: int, owner: str) -> Topic:
-    topic = _load_topic_owned(topic_id, owner)
-    if topic is not None:
-        return topic
-    topic = _load_topic_visible(topic_id, owner)
-    if topic is not None:
-        if topic.owner == PUBLIC_OWNER and is_admin_user(owner):
-            return topic
-        if topic.owner == PUBLIC_OWNER:
-            raise HTTPException(403, "公开示例仅管理员可修改")
-        raise HTTPException(403, "无权修改该选题")
-    raise HTTPException(404, "topic not found")
-
-
-def _topic_write_owner(topic: Topic, user: str) -> str:
-    if topic.owner == PUBLIC_OWNER and is_admin_user(user):
-        return PUBLIC_OWNER
-    return user
-
-
-# ===== Auth endpoints =====
+# ===== Auth =====
 
 @app.get("/api/me")
 def api_me(request: Request) -> dict:
@@ -468,36 +374,7 @@ def api_login(payload: LoginIn, request: Request) -> dict:
     if not user:
         raise HTTPException(401, "用户名或密码错误")
     request.session["user"] = user
-    logger.info("login: %s", user)
     return {"user": user, "is_admin": is_admin_user(user)}
-
-
-@app.get("/api/usage")
-def api_usage(user: str = Depends(require_user)) -> dict:
-    rem = usage_remaining(user)
-    return {
-        "limit": FREE_LIMIT,
-        "unlimited": rem is None,
-        "remaining": rem,
-    }
-
-
-@app.get("/api/contact")
-def api_contact() -> dict:
-    """联系方式 + 宣传图。图片优先 web/static/contact.png/.jpg,缺省回退到占位 SVG。"""
-    for ext in (".png", ".jpg", ".jpeg", ".webp", ".gif"):
-        p = STATIC_DIR / f"contact{ext}"
-        if p.exists():
-            return {
-                "image": f"/static/{p.name}",
-                "title": "联系我们",
-                "subtitle": "扫码关注公众号 / 加微信获取更多额度",
-            }
-    return {
-        "image": "/static/contact-placeholder.svg",
-        "title": "联系我们",
-        "subtitle": "把公众号宣传图保存为 web/static/contact.png 替换占位图",
-    }
 
 
 @app.post("/api/logout")
@@ -515,7 +392,24 @@ def api_register(payload: LoginIn, request: Request) -> dict:
     return {"user": payload.username, "is_admin": is_admin_user(payload.username)}
 
 
-# ===== Topic endpoints =====
+@app.get("/api/usage")
+def api_usage(user: str = Depends(require_user)) -> dict:
+    rem = usage_remaining(user)
+    return {"limit": FREE_LIMIT, "unlimited": rem is None, "remaining": rem}
+
+
+@app.get("/api/contact")
+def api_contact() -> dict:
+    for ext in (".png", ".jpg", ".jpeg", ".webp", ".gif"):
+        p = STATIC_DIR / f"contact{ext}"
+        if p.exists():
+            return {"image": f"/static/{p.name}", "title": "联系我们",
+                    "subtitle": "扫码关注公众号 / 加微信获取更多额度"}
+    return {"image": "/static/contact-placeholder.svg", "title": "联系我们",
+            "subtitle": "把公众号宣传图保存为 web/static/contact.png 替换占位图"}
+
+
+# ===== Topic listing (merged) =====
 
 @app.get("/api/templates")
 def api_templates() -> list[dict]:
@@ -529,150 +423,201 @@ def api_models() -> list[dict]:
 
 @app.get("/api/topics", response_model=list[TopicOut])
 def api_list_topics(
+    request: Request,
     status: Optional[TopicStatus] = None,
-    user: Optional[str] = Depends(current_user),
 ) -> list[TopicOut]:
-    owners = [PUBLIC_OWNER]
-    if user:
-        owners.append(user)
-    with get_session() as s:
-        stmt = select(Topic).options(selectinload(Topic.article)).where(Topic.owner.in_(owners))
+    user = current_user(request)
+    out: list[TopicOut] = []
+
+    # public scope: always visible
+    with get_session(PUBLIC_SCOPE) as s:
+        stmt = select(Topic).options(selectinload(Topic.article))
         if status is not None:
             stmt = stmt.where(Topic.status == status.value)
         stmt = stmt.order_by(Topic.updated_at.desc())
-        topics = list(s.execute(stmt).scalars().all())
-        return [TopicOut.from_orm_with_article(t) for t in topics]
+        for t in s.execute(stmt).scalars().all():
+            out.append(TopicOut.from_orm_with_article(t, is_public=True))
+
+    # user scope
+    if user:
+        with get_session(user) as s:
+            stmt = select(Topic).options(selectinload(Topic.article))
+            if status is not None:
+                stmt = stmt.where(Topic.status == status.value)
+            stmt = stmt.order_by(Topic.updated_at.desc())
+            for t in s.execute(stmt).scalars().all():
+                out.append(TopicOut.from_orm_with_article(t, is_public=False))
+
+    out.sort(key=lambda x: x.updated_at, reverse=True)
+    return out
 
 
-@app.post("/api/topics", response_model=TopicOut, status_code=201)
-def api_create_topic(payload: TopicIn, user: str = Depends(require_user)) -> TopicOut:
-    t = create_topic(
-        owner=user,
-        title=payload.title,
-        content_type=payload.content_type,
-        notes=payload.notes,
-        model=_topic_model(payload.model),
-    )
-    return TopicOut.from_orm_with_article(_load_topic_owned(t.id, user))
+# ===== Per-topic ops: factor by scope =====
 
+def _topic_routes(prefix: str, public: bool, write_dep) -> None:
+    """注册 /api{prefix}/topics/... 一组路由。public=True 时 prefix='/public'。"""
 
-@app.get("/api/topics/{topic_id}", response_model=TopicOut)
-def api_get_topic(topic_id: int, user: Optional[str] = Depends(current_user)) -> TopicOut:
-    t = _load_topic_visible(topic_id, user)
-    if t is None:
-        raise HTTPException(404, "topic not found")
-    return TopicOut.from_orm_with_article(t)
+    @app.post(f"/api{prefix}/topics", response_model=TopicOut, status_code=201)
+    def _create_topic(payload: TopicIn, user: str = Depends(write_dep)) -> TopicOut:
+        scope = _scope_for(user, public)
+        t = create_topic(
+            scope=scope,
+            title=payload.title,
+            content_type=payload.content_type,
+            notes=payload.notes,
+            model=_topic_model(payload.model),
+        )
+        return TopicOut.from_orm_with_article(_load_topic(scope, t.id), is_public=public)
 
+    @app.get(f"/api{prefix}/topics/{{topic_id}}", response_model=TopicOut)
+    def _get_topic(topic_id: int, request: Request) -> TopicOut:
+        scope = _scope_for(current_user(request), public)
+        return TopicOut.from_orm_with_article(_load_topic(scope, topic_id), is_public=public)
 
-@app.patch("/api/topics/{topic_id}", response_model=TopicOut)
-def api_patch_topic(topic_id: int, payload: TopicPatch, user: str = Depends(require_user)) -> TopicOut:
-    topic = _load_topic_writable(topic_id, user)
-    write_owner = _topic_write_owner(topic, user)
-    data = payload.model_dump(exclude_unset=True)
-    new_status = data.pop("status", None)
-    if "model" in data:
-        data["model"] = _topic_model(data["model"])
-    if data:
-        if update_topic(topic_id, write_owner, **data) is None:
+    @app.patch(f"/api{prefix}/topics/{{topic_id}}", response_model=TopicOut)
+    def _patch_topic(topic_id: int, payload: TopicPatch, user: str = Depends(write_dep)) -> TopicOut:
+        scope = _scope_for(user, public)
+        _require_write_perm(scope, user)
+        data = payload.model_dump(exclude_unset=True)
+        new_status = data.pop("status", None)
+        if "model" in data:
+            data["model"] = _topic_model(data["model"])
+        if data:
+            if update_topic(topic_id, scope, **data) is None:
+                raise HTTPException(404, "topic not found")
+        if new_status is not None:
+            if set_status(topic_id, new_status, scope) is None:
+                raise HTTPException(404, "topic not found")
+        return TopicOut.from_orm_with_article(_load_topic(scope, topic_id), is_public=public)
+
+    @app.delete(f"/api{prefix}/topics/{{topic_id}}", status_code=204, response_class=Response)
+    def _delete_topic(topic_id: int, user: str = Depends(write_dep)) -> Response:
+        scope = _scope_for(user, public)
+        _require_write_perm(scope, user)
+        if scope == PUBLIC_SCOPE:
+            raise HTTPException(403, "公开示例不能删除")
+        if not delete_topic(topic_id, scope):
             raise HTTPException(404, "topic not found")
-    if new_status is not None:
-        if set_status(topic_id, new_status, write_owner) is None:
-            raise HTTPException(404, "topic not found")
-    t = _load_topic_visible(topic_id, user)
-    if t is None:
-        raise HTTPException(404, "topic not found")
-    return TopicOut.from_orm_with_article(t)
+        return Response(status_code=204)
+
+    @app.get(f"/api{prefix}/topics/{{topic_id}}/article", response_model=ArticleOut)
+    def _get_article(topic_id: int, request: Request) -> ArticleOut:
+        scope = _scope_for(current_user(request), public)
+        _load_topic(scope, topic_id)
+        return _article_out(scope, topic_id)
+
+    @app.patch(f"/api{prefix}/topics/{{topic_id}}/article", response_model=ArticleOut)
+    def _patch_article(topic_id: int, payload: ArticlePatch, user: str = Depends(write_dep)) -> ArticleOut:
+        scope = _scope_for(user, public)
+        _require_write_perm(scope, user)
+        _load_topic(scope, topic_id)
+        data = payload.model_dump(exclude_unset=True)
+        if scope == PUBLIC_SCOPE and "draft" in data:
+            data["file_path"] = _write_public_example_file(data["draft"] or "")
+        _upsert_article(scope, topic_id, **data)
+        return _article_out(scope, topic_id)
+
+    @app.post(f"/api{prefix}/topics/{{topic_id}}/outline", response_model=ArticleOut)
+    def _gen_outline(topic_id: int, user: str = Depends(write_dep)) -> ArticleOut:
+        scope = _scope_for(user, public)
+        _require_write_perm(scope, user)
+        topic = _load_topic(scope, topic_id)
+        enforce_and_increment(user)
+        try:
+            result = generate_outline(topic)
+        except Exception as e:  # noqa: BLE001
+            logger.exception("outline failed")
+            raise HTTPException(500, f"outline 生成失败：{e}") from e
+        _upsert_article(scope, topic_id, outline=result["outline"], model=result["model"])
+        if topic.status == TopicStatus.DRAFT.value:
+            set_status(topic_id, TopicStatus.WRITING, scope)
+        return _article_out(scope, topic_id)
+
+    @app.post(f"/api{prefix}/topics/{{topic_id}}/draft", response_model=ArticleOut)
+    def _gen_draft(topic_id: int, user: str = Depends(write_dep)) -> ArticleOut:
+        scope = _scope_for(user, public)
+        _require_write_perm(scope, user)
+        topic = _load_topic(scope, topic_id)
+        art = _article_out(scope, topic_id)
+        if not art.outline:
+            raise HTTPException(400, "请先生成或填写大纲")
+        enforce_and_increment(user)
+        try:
+            result = generate_draft(topic, art.outline)
+        except Exception as e:  # noqa: BLE001
+            logger.exception("draft failed")
+            raise HTTPException(500, f"draft 生成失败：{e}") from e
+        file_path = (
+            _write_public_example_file(result["draft"]) if scope == PUBLIC_SCOPE
+            else _save_draft_file(scope, topic, result["draft"])
+        )
+        _upsert_article(scope, topic_id, draft=result["draft"], model=result["model"], file_path=file_path)
+        _snapshot_revision(scope, topic_id, result["draft"], model=result["model"], source="draft")
+        set_status(topic_id, TopicStatus.DONE, scope)
+        return _article_out(scope, topic_id)
+
+    @app.post(f"/api{prefix}/topics/{{topic_id}}/draft/revise", response_model=ArticleOut)
+    def _revise_draft(topic_id: int, payload: ReviseIn, user: str = Depends(write_dep)) -> ArticleOut:
+        scope = _scope_for(user, public)
+        _require_write_perm(scope, user)
+        topic = _load_topic(scope, topic_id)
+        art = _article_out(scope, topic_id)
+        if not art.draft:
+            raise HTTPException(400, "当前没有初稿可修改,请先生成初稿")
+        enforce_and_increment(user)
+        try:
+            result = generate_revision(topic, art.outline or "", art.draft, payload.instruction)
+        except ValueError as e:
+            raise HTTPException(400, str(e)) from e
+        except Exception as e:  # noqa: BLE001
+            logger.exception("revise failed")
+            raise HTTPException(500, f"修改失败：{e}") from e
+        file_path = (
+            _write_public_example_file(result["draft"]) if scope == PUBLIC_SCOPE
+            else _save_draft_file(scope, topic, result["draft"])
+        )
+        _upsert_article(scope, topic_id, draft=result["draft"], model=result["model"], file_path=file_path)
+        _snapshot_revision(scope, topic_id, result["draft"], model=result["model"],
+                           source="revise", note=payload.instruction[:200])
+        return _article_out(scope, topic_id)
+
+    @app.get(f"/api{prefix}/topics/{{topic_id}}/revisions")
+    def _list_revisions(topic_id: int, request: Request) -> list[dict]:
+        scope = _scope_for(current_user(request), public)
+        _load_topic(scope, topic_id)
+        with get_session(scope) as s:
+            rows = list(s.execute(
+                select(ArticleRevision).where(ArticleRevision.topic_id == topic_id)
+                .order_by(ArticleRevision.created_at.desc()).limit(50)
+            ).scalars().all())
+            return [
+                {
+                    "id": r.id, "source": r.source, "model": r.model, "note": r.note,
+                    "created_at": r.created_at.isoformat(),
+                    "preview": (r.draft[:120] + "…") if len(r.draft) > 120 else r.draft,
+                    "length": len(r.draft),
+                }
+                for r in rows
+            ]
+
+    @app.get(f"/api{prefix}/topics/{{topic_id}}/revisions/{{rev_id}}")
+    def _get_revision(topic_id: int, rev_id: int, request: Request) -> dict:
+        scope = _scope_for(current_user(request), public)
+        _load_topic(scope, topic_id)
+        with get_session(scope) as s:
+            rev = s.get(ArticleRevision, rev_id)
+            if rev is None or rev.topic_id != topic_id:
+                raise HTTPException(404, "revision not found")
+            return {
+                "id": rev.id, "source": rev.source, "model": rev.model, "note": rev.note,
+                "created_at": rev.created_at.isoformat(), "draft": rev.draft,
+            }
 
 
-@app.delete("/api/topics/{topic_id}", status_code=204, response_class=Response)
-def api_delete_topic(topic_id: int, user: str = Depends(require_user)) -> Response:
-    topic = _load_topic_writable(topic_id, user)
-    if topic.owner == PUBLIC_OWNER:
-        raise HTTPException(403, "公开示例不能删除")
-    if not delete_topic(topic_id, user):
-        raise HTTPException(404, "topic not found")
-    return Response(status_code=204)
-
-
-# ===== Article endpoints =====
-
-@app.get("/api/topics/{topic_id}/article", response_model=ArticleOut)
-def api_get_article(topic_id: int, user: Optional[str] = Depends(current_user)) -> ArticleOut:
-    if _load_topic_visible(topic_id, user) is None:
-        raise HTTPException(404, "topic not found")
-    return _article_out(topic_id)
-
-
-@app.patch("/api/topics/{topic_id}/article", response_model=ArticleOut)
-def api_patch_article(topic_id: int, payload: ArticlePatch, user: str = Depends(require_user)) -> ArticleOut:
-    topic = _load_topic_writable(topic_id, user)
-    data = payload.model_dump(exclude_unset=True)
-    if topic.owner == PUBLIC_OWNER and "draft" in data:
-        data["file_path"] = _write_public_example_file(data["draft"] or "")
-    _upsert_article(topic_id, **data)
-    return _article_out(topic_id)
-
-
-@app.post("/api/topics/{topic_id}/outline", response_model=ArticleOut)
-def api_gen_outline(topic_id: int, user: str = Depends(require_user)) -> ArticleOut:
-    topic = _load_topic_writable(topic_id, user)
-    write_owner = _topic_write_owner(topic, user)
-    enforce_and_increment(user)
-    try:
-        result = generate_outline(topic)
-    except Exception as e:  # noqa: BLE001
-        logger.exception("outline generation failed")
-        raise HTTPException(500, f"outline 生成失败：{e}") from e
-    _upsert_article(topic_id, outline=result["outline"], model=result["model"])
-    if topic.status == TopicStatus.DRAFT.value:
-        set_status(topic_id, TopicStatus.WRITING, write_owner)
-    return _article_out(topic_id)
-
-
-@app.post("/api/topics/{topic_id}/draft/revise", response_model=ArticleOut)
-def api_revise_draft(topic_id: int, payload: ReviseIn, user: str = Depends(require_user)) -> ArticleOut:
-    topic = _load_topic_writable(topic_id, user)
-    art = _article_out(topic_id)
-    if not art.draft:
-        raise HTTPException(400, "当前没有初稿可修改，请先生成初稿")
-    enforce_and_increment(user)
-    try:
-        result = generate_revision(topic, art.outline or "", art.draft, payload.instruction)
-    except ValueError as e:
-        raise HTTPException(400, str(e)) from e
-    except Exception as e:  # noqa: BLE001
-        logger.exception("revise failed")
-        raise HTTPException(500, f"修改失败：{e}") from e
-    file_path = (
-        _write_public_example_file(result["draft"])
-        if topic.owner == PUBLIC_OWNER
-        else _save_draft_file(topic, result["draft"], user)
-    )
-    _upsert_article(topic_id, draft=result["draft"], model=result["model"], file_path=file_path)
-    return _article_out(topic_id)
-
-
-@app.post("/api/topics/{topic_id}/draft", response_model=ArticleOut)
-def api_gen_draft(topic_id: int, user: str = Depends(require_user)) -> ArticleOut:
-    topic = _load_topic_writable(topic_id, user)
-    write_owner = _topic_write_owner(topic, user)
-    art = _article_out(topic_id)
-    if not art.outline:
-        raise HTTPException(400, "请先生成或填写大纲")
-    enforce_and_increment(user)
-    try:
-        result = generate_draft(topic, art.outline)
-    except Exception as e:  # noqa: BLE001
-        logger.exception("draft generation failed")
-        raise HTTPException(500, f"draft 生成失败：{e}") from e
-    file_path = (
-        _write_public_example_file(result["draft"])
-        if topic.owner == PUBLIC_OWNER
-        else _save_draft_file(topic, result["draft"], user)
-    )
-    _upsert_article(topic_id, draft=result["draft"], model=result["model"], file_path=file_path)
-    set_status(topic_id, TopicStatus.DONE, write_owner)
-    return _article_out(topic_id)
+# 用户路由(/api/topics/*) - require login
+_topic_routes("", public=False, write_dep=require_user)
+# 公开示例路由(/api/public/topics/*) - 读公开可匿名,写需管理员
+_topic_routes("/public", public=True, write_dep=require_admin)
 
 
 # ===== Uploads =====
@@ -698,7 +643,7 @@ async def api_upload_image(file: UploadFile = File(...), user: str = Depends(req
     return {"url": f"/uploads/{user_dir.name}/{out.name}", "path": rel, "size": len(data)}
 
 
-# ===== Static frontend =====
+# ===== Static =====
 
 app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 

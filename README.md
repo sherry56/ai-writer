@@ -130,9 +130,49 @@ ai-writer/
 
 OpenAPI 文档:`http://localhost:8000/docs`
 
+## 用户隔离 & 数据存放
+
+v0.3 起内置账户登录,所有数据按 owner 字段或文件目录隔离:
+
+```
+data/
+├── db.sqlite                         # 共享元数据,所有跨用户表都带 owner 列
+│   ├── topics(owner)                 # 选题:WHERE owner = 当前登录用户 OR owner = '*'
+│   ├── articles(topic_id → topics)   # 文章:跟随 topic.owner 间接隔离
+│   └── user_usage(username)          # 每用户免费次数
+├── articles/
+│   ├── public/                       # owner='*' 的公开示例(README.md 同步)
+│   ├── sherry/                       # 管理员落盘的 .md 初稿
+│   ├── alice/                        # alice 的 .md 初稿
+│   └── ...
+└── uploads/
+    ├── sherry/                       # 管理员上传的图(URL: /uploads/sherry/<file>)
+    ├── alice/                        # alice 上传的图
+    └── ...
+```
+
+### 隔离保证
+
+- `/api/topics` 等所有 API 查询永远附加 `WHERE owner = current_user OR owner = '*'`
+- 落盘函数硬编码到 `/data/articles/<user>/` 子目录;上传同理
+- `PUBLIC_OWNER = '*'` 的资源是公开只读,只有 `ADMIN_USER`(默认 `sherry`)能改
+- 用户配置在 `config/users.json`(已 gitignore);bcrypt 哈希存储
+- 模型 API key 在 `config/models.json`(已 gitignore),前端 `/api/models` 只暴露 value/label
+
+### 新增用户
+
+```bash
+# 生成 bcrypt 哈希
+python -m web.tools.hashpw "my-new-password"
+
+# 把哈希填进 config/users.json 后重启
+```
+
+或通过 `/api/register` 自助注册(会自动 bcrypt 哈希入 `users.json`)。
+
 ## 不做的 (v1 再说)
 
 - 审校(事实核查、AI 味检测)
 - 排版器集成
-- 定时调度、多账号
-- 用户系统(当前默认单用户,如需公网暴露请在反代层加 BasicAuth)
+- 定时调度
+- 物理多库(目前所有用户共用 db.sqlite,通过 owner 列隔离;若需绝对隔离可后续切到 per-user SQLite 文件)

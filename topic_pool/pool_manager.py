@@ -1,5 +1,7 @@
 """
-选题池增删改查（按 owner 隔离）。
+选题池(每个 scope 一个 SQLite,scope = 用户名 或 '_public')。
+
+API 不再有 owner 概念,scope 即 owner。Topic.owner 列保留兼容,值固定为 scope。
 """
 
 from __future__ import annotations
@@ -10,75 +12,69 @@ from typing import Optional
 
 from sqlalchemy import select
 
-from db import ContentType, Topic, TopicStatus, get_session
+from db import ContentType, PUBLIC_SCOPE, Topic, TopicStatus, get_session
 
 logger = logging.getLogger(__name__)
+
+# 公开示例还是叫 '*'(对外含义不变),scope 名是 '_public'
+PUBLIC_OWNER = "*"
 
 
 def _db_value(value):
     return value.value if isinstance(value, Enum) else value
 
 
-PUBLIC_OWNER = "*"  # owner='*' 表示公开示例,所有登录用户可见(只读)
-
-
 def list_topics(
-    owner: str,
+    scope: str,
     status: Optional[TopicStatus] = None,
     limit: int = 200,
 ) -> list[Topic]:
-    with get_session() as s:
-        stmt = select(Topic).where(Topic.owner.in_([owner, PUBLIC_OWNER]))
+    with get_session(scope) as s:
+        stmt = select(Topic)
         if status is not None:
             stmt = stmt.where(Topic.status == _db_value(status))
         stmt = stmt.order_by(Topic.updated_at.desc()).limit(limit)
         return list(s.execute(stmt).scalars().all())
 
 
-def get_topic(topic_id: int, owner: Optional[str] = None) -> Optional[Topic]:
-    """按 id 查;owner 提供时允许本人或 PUBLIC 资源,否则返回 None。"""
-    with get_session() as s:
-        t = s.get(Topic, topic_id)
-        if t is None:
-            return None
-        if owner is not None and t.owner != owner and t.owner != PUBLIC_OWNER:
-            return None
-        return t
+def get_topic(topic_id: int, scope: str) -> Optional[Topic]:
+    with get_session(scope) as s:
+        return s.get(Topic, topic_id)
 
 
 def create_topic(
     *,
-    owner: str,
+    scope: str,
     title: str,
     content_type: ContentType = ContentType.PRODUCT_REVIEW,
     notes: Optional[str] = None,
-    model: Optional[str] = None,
     status: TopicStatus = TopicStatus.DRAFT,
+    model: Optional[str] = None,
 ) -> Topic:
-    with get_session() as s:
+    with get_session(scope) as s:
+        owner_label = PUBLIC_OWNER if scope == PUBLIC_SCOPE else scope
         topic = Topic(
             title=title.strip(),
             content_type=_db_value(content_type),
             notes=notes,
-            model=model,
             status=_db_value(status),
-            owner=owner,
+            owner=owner_label,
+            model=model,
         )
         s.add(topic)
         s.flush()
-        logger.info("create_topic id=%s owner=%s title=%s", topic.id, owner, topic.title[:40])
+        logger.info("create_topic scope=%s id=%s title=%s", scope, topic.id, topic.title[:40])
         return topic
 
 
-def update_topic(topic_id: int, owner: str, **fields) -> Optional[Topic]:
+def update_topic(topic_id: int, scope: str, **fields) -> Optional[Topic]:
     ALLOWED = {"title", "content_type", "notes", "model"}
     bad = set(fields) - ALLOWED
     if bad:
-        raise ValueError(f"不允许通过 update_topic 修改的字段：{bad}（请用 set_status）")
-
-    with get_session() as s:
+        raise ValueError(f"不允许通过 update_topic 修改的字段:{bad}(请用 set_status)")
+    with get_session(scope) as s:
         topic = s.get(Topic, topic_id)
-        if topic is None or topic.owner != owner:
+        if topic is None:
             return None
         for k, v in fields.items():
             if k == "content_type":
@@ -87,20 +83,19 @@ def update_topic(topic_id: int, owner: str, **fields) -> Optional[Topic]:
         return topic
 
 
-def set_status(topic_id: int, status: TopicStatus, owner: str) -> Optional[Topic]:
-    with get_session() as s:
+def set_status(topic_id: int, status: TopicStatus, scope: str) -> Optional[Topic]:
+    with get_session(scope) as s:
         topic = s.get(Topic, topic_id)
-        if topic is None or topic.owner != owner:
+        if topic is None:
             return None
         topic.status = _db_value(status)
-        logger.info("set_status id=%s -> %s (owner=%s)", topic_id, status, owner)
         return topic
 
 
-def delete_topic(topic_id: int, owner: str) -> bool:
-    with get_session() as s:
+def delete_topic(topic_id: int, scope: str) -> bool:
+    with get_session(scope) as s:
         topic = s.get(Topic, topic_id)
-        if topic is None or topic.owner != owner:
+        if topic is None:
             return False
         s.delete(topic)
         return True

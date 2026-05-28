@@ -8,7 +8,7 @@ from typing import Optional
 
 from fastapi import HTTPException
 
-from db import UserUsage, get_session
+from db import UserUsage, shared_session
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ def is_admin(user: str) -> bool:
 
 
 def get_count(user: str) -> int:
-    with get_session() as s:
+    with shared_session() as s:
         row = s.get(UserUsage, user)
         return row.count if row else 0
 
@@ -37,7 +37,7 @@ def enforce_and_increment(user: str) -> None:
     """检查并 +1。超出额度抛 402。"""
     if is_admin(user):
         return
-    with get_session() as s:
+    with shared_session() as s:
         row = s.get(UserUsage, user)
         if row is None:
             row = UserUsage(username=user, count=0)

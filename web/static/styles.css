@@ -178,6 +178,24 @@
 #draft-modal-toc li.level-6 { padding-left: 48px; font-size: 12px; color: #a8a29e; }
 #draft-modal-toc .empty { padding: 12px; color: #a8a29e; font-size: 12px; }
 
+/* history list */
+#history-list li {
+  padding: 8px 12px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  cursor: default;
+}
+#history-list li:hover { background: #fffbeb; }
+#history-list .h-time { color: #92400e; font-weight: 500; flex-shrink: 0; min-width: 130px; }
+#history-list .h-src { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 10px; flex-shrink: 0; }
+#history-list .h-src.draft { background: #d9f99d; color: #3f6212; }
+#history-list .h-src.revise { background: #fed7aa; color: #9a3412; }
+#history-list .h-src.manual { background: #fef3c7; color: #92400e; }
+#history-list .h-preview { color: #57534e; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#history-list .h-actions { display: flex; gap: 4px; flex-shrink: 0; }
+#history-list .h-empty { padding: 12px; color: #a8a29e; }
+
 /* indeterminate striped progress bar */
 .progress-stripe {
   width: 200%;

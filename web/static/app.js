@@ -24,16 +24,20 @@ const api = {
   logout: () => api.req("POST", "/api/logout"),
   usage: () => api.req("GET", "/api/usage"),
   contact: () => api.req("GET", "/api/contact"),
+  // public-aware paths: pass topic object (with is_public) or {id, is_public}
+  _scope: (t) => (t && t.is_public ? "/public" : ""),
   listTopics: (status) => api.req("GET", "/api/topics" + (status ? `?status=${status}` : "")),
-  getTopic: (id) => api.req("GET", `/api/topics/${id}`),
+  getTopic: (t) => api.req("GET", `/api${api._scope(t)}/topics/${t.id}`),
   createTopic: (data) => api.req("POST", "/api/topics", data),
-  patchTopic: (id, data) => api.req("PATCH", `/api/topics/${id}`, data),
-  deleteTopic: (id) => api.req("DELETE", `/api/topics/${id}`),
-  getArticle: (id) => api.req("GET", `/api/topics/${id}/article`),
-  patchArticle: (id, data) => api.req("PATCH", `/api/topics/${id}/article`, data),
-  genOutline: (id) => api.req("POST", `/api/topics/${id}/outline`),
-  genDraft: (id) => api.req("POST", `/api/topics/${id}/draft`),
-  reviseDraft: (id, instruction) => api.req("POST", `/api/topics/${id}/draft/revise`, { instruction }),
+  patchTopic: (t, data) => api.req("PATCH", `/api${api._scope(t)}/topics/${t.id}`, data),
+  deleteTopic: (t) => api.req("DELETE", `/api${api._scope(t)}/topics/${t.id}`),
+  getArticle: (t) => api.req("GET", `/api${api._scope(t)}/topics/${t.id}/article`),
+  patchArticle: (t, data) => api.req("PATCH", `/api${api._scope(t)}/topics/${t.id}/article`, data),
+  genOutline: (t) => api.req("POST", `/api${api._scope(t)}/topics/${t.id}/outline`),
+  genDraft: (t) => api.req("POST", `/api${api._scope(t)}/topics/${t.id}/draft`),
+  reviseDraft: (t, instruction) => api.req("POST", `/api${api._scope(t)}/topics/${t.id}/draft/revise`, { instruction }),
+  listRevisions: (t) => api.req("GET", `/api${api._scope(t)}/topics/${t.id}/revisions`),
+  getRevision: (t, rid) => api.req("GET", `/api${api._scope(t)}/topics/${t.id}/revisions/${rid}`),
   templates: () => api.req("GET", "/api/templates"),
   models: () => api.req("GET", "/api/models"),
 };
@@ -177,7 +181,7 @@ function renderTopicList() {
     return;
   }
   ul.innerHTML = state.topics.map(t => `
-    <li class="topic-item ${state.current?.topic.id === t.id ? 'active' : ''}" data-id="${t.id}">
+    <li class="topic-item ${state.current?.topic.id === t.id && state.current?.topic.is_public === t.is_public ? 'active' : ''}" data-id="${t.id}" data-public="${t.is_public ? '1' : '0'}">
       <div class="title">${escapeHtml(t.title)}</div>
       <div class="meta">
         ${isPublicTopic(t) ? '<span class="badge public">公开示例</span>' : ''}
@@ -187,7 +191,7 @@ function renderTopicList() {
     </li>
   `).join("");
   ul.querySelectorAll(".topic-item").forEach(el => {
-    el.addEventListener("click", () => openTopic(parseInt(el.dataset.id)));
+    el.addEventListener("click", () => openTopic({ id: parseInt(el.dataset.id), is_public: el.dataset.public === "1" }));
   });
 }
 
@@ -223,13 +227,14 @@ async function openPublicExample() {
     toast("暂无公开示例");
     return;
   }
-  await openTopic(t.id);
+  await openTopic(t);
 }
 
 // ===== editor =====
 
-async function openTopic(id) {
-  const [topic, article] = await Promise.all([api.getTopic(id), api.getArticle(id)]);
+async function openTopic(ref) {
+  // ref: full topic object OR { id, is_public }
+  const [topic, article] = await Promise.all([api.getTopic(ref), api.getArticle(ref)]);
   state.current = { topic, article };
   renderTopicList();
   renderEditor();
@@ -330,9 +335,9 @@ function bindEditor() {
   }
 
   document.getElementById("ed-status").addEventListener("change", async (e) => {
-    await api.patchTopic(topic.id, { status: e.target.value });
+    await api.patchTopic(topic, { status: e.target.value });
     await refreshTopics();
-    await openTopic(topic.id);
+    await openTopic(topic);
     toast("状态已更新");
   });
 
@@ -340,7 +345,7 @@ function bindEditor() {
 
   document.getElementById("btn-delete").addEventListener("click", async () => {
     if (!confirm(`删除选题「${topic.title}」?`)) return;
-    await api.deleteTopic(topic.id);
+    await api.deleteTopic(topic);
     state.current = null;
     await refreshTopics();
     renderEditor();
@@ -350,7 +355,7 @@ function bindEditor() {
 
   document.getElementById("btn-gen-outline").addEventListener("click", async (e) => {
     await runWithSpinner(e.currentTarget, "生成中...", async () => {
-      const art = await api.genOutline(topic.id);
+      const art = await api.genOutline(topic);
       state.current.article = art;
       await refreshTopics();
       await refreshUsageBadge();
@@ -365,7 +370,7 @@ function bindEditor() {
 
   document.getElementById("btn-save-outline").addEventListener("click", async () => {
     const outline = document.getElementById("ed-outline").value;
-    state.current.article = await api.patchArticle(topic.id, { outline });
+    state.current.article = await api.patchArticle(topic, { outline });
     updatePreview();
     toast("大纲已保存");
   });
@@ -373,9 +378,9 @@ function bindEditor() {
   document.getElementById("btn-gen-draft").addEventListener("click", async (e) => {
     const outline = document.getElementById("ed-outline").value;
     if (!outline.trim()) { toast("请先生成或填写大纲"); return; }
-    await api.patchArticle(topic.id, { outline });
+    await api.patchArticle(topic, { outline });
     await runWithSpinner(e.currentTarget, "生成中（可能 30-60s）...", async () => {
-      const art = await api.genDraft(topic.id);
+      const art = await api.genDraft(topic);
       state.current.article = art;
       await refreshTopics();
       await refreshUsageBadge();
@@ -390,7 +395,7 @@ function bindEditor() {
 
   document.getElementById("btn-save-draft").addEventListener("click", async () => {
     const draft = document.getElementById("ed-draft").value;
-    state.current.article = await api.patchArticle(topic.id, { draft });
+    state.current.article = await api.patchArticle(topic, { draft });
     updatePreview();
     toast("初稿已保存");
   });
@@ -721,6 +726,76 @@ function openDraftModal() {
   bindModalImageHandlers(ta);
   bindTocLive(ta);
   bindModeButtons();
+  refreshHistory();
+}
+
+async function refreshHistory() {
+  if (!state.current) return;
+  const { topic } = state.current;
+  const ul = document.getElementById("history-list");
+  const count = document.getElementById("history-count");
+  if (!ul) return;
+  try {
+    const list = await api.listRevisions(topic);
+    count.textContent = list.length ? `(${list.length})` : "";
+    if (!list.length) {
+      ul.innerHTML = '<li class="h-empty">尚无历史版本</li>';
+      return;
+    }
+    const SRC = { draft: "生成", revise: "AI修改", manual: "手动" };
+    ul.innerHTML = list.map(r => {
+      const t = new Date(r.created_at);
+      const tStr = `${t.getMonth()+1}-${String(t.getDate()).padStart(2,'0')} ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}:${String(t.getSeconds()).padStart(2,'0')}`;
+      const note = r.note ? ` · ${escapeHtml(r.note.slice(0, 40))}` : "";
+      return `<li data-rid="${r.id}">
+        <span class="h-time">${tStr}</span>
+        <span class="h-src ${r.source}">${SRC[r.source] || r.source}</span>
+        <span class="h-preview" title="${escapeHtml(r.preview)}${escapeHtml(note)}">${escapeHtml(r.preview)}${note}</span>
+        <span class="h-actions">
+          <button type="button" class="btn h-view" data-rid="${r.id}">查看</button>
+          <button type="button" class="btn h-restore" data-rid="${r.id}">恢复</button>
+        </span>
+      </li>`;
+    }).join("");
+    ul.querySelectorAll(".h-view").forEach(b => b.addEventListener("click", () => viewRevision(parseInt(b.dataset.rid))));
+    ul.querySelectorAll(".h-restore").forEach(b => b.addEventListener("click", () => restoreRevision(parseInt(b.dataset.rid))));
+  } catch (e) {
+    ul.innerHTML = `<li class="h-empty">加载失败：${escapeHtml(e.message)}</li>`;
+  }
+}
+
+async function viewRevision(rid) {
+  if (!state.current) return;
+  const { topic } = state.current;
+  try {
+    const rev = await api.getRevision(topic, rid);
+    const ta = document.getElementById("draft-modal-text");
+    if (ta.value !== rev.draft && !confirm("当前编辑内容将被替换为该历史版本预览，未保存的修改会丢失。继续？")) return;
+    ta.value = rev.draft;
+    buildDraftToc(rev.draft);
+    setDraftMode("md");
+    toast("已载入历史版本到编辑器（保存即覆盖当前）");
+  } catch (e) {
+    toast("读取失败：" + e.message, 5000);
+  }
+}
+
+async function restoreRevision(rid) {
+  if (!state.current) return;
+  const { topic } = state.current;
+  if (!confirm("把此历史版本设为当前初稿？当前未保存修改会被覆盖。")) return;
+  try {
+    const rev = await api.getRevision(topic, rid);
+    state.current.article = await api.patchArticle(topic, { draft: rev.draft });
+    document.getElementById("draft-modal-text").value = rev.draft;
+    buildDraftToc(rev.draft);
+    const ed = document.getElementById("ed-draft"); if (ed) ed.value = rev.draft;
+    updatePreview();
+    await refreshHistory();
+    toast("已恢复为历史版本");
+  } catch (e) {
+    toast("恢复失败：" + e.message, 5000);
+  }
 }
 
 let _modeBound = false;
@@ -844,7 +919,7 @@ async function saveDraftFromModal() {
   if (isPublicTopic(state.current.topic) && !state.isAdmin) { toast(READONLY_PUBLIC_MSG); return; }
   const { topic } = state.current;
   const draft = document.getElementById("draft-modal-text").value;
-  state.current.article = await api.patchArticle(topic.id, { draft });
+  state.current.article = await api.patchArticle(topic, { draft });
   // sync small editor + preview
   const ed = document.getElementById("ed-draft"); if (ed) ed.value = draft;
   updatePreview();
@@ -876,9 +951,9 @@ async function reviseDraftFromModal(btn) {
   const start = Date.now();
   console.log("[revise] start; topic", topic.id, "instr:", instruction);
   try {
-    await api.patchArticle(topic.id, { draft });
+    await api.patchArticle(topic, { draft });
     console.log("[revise] draft saved, calling /revise");
-    const art = await api.reviseDraft(topic.id, instruction);
+    const art = await api.reviseDraft(topic, instruction);
     console.log("[revise] got response; draft length:", (art.draft || "").length);
     if (!art.draft) {
       toast("修改完成但返回为空，请重试或换个指令", 6000);
@@ -886,6 +961,7 @@ async function reviseDraftFromModal(btn) {
     }
     state.current.article = art;
     await refreshUsageBadge();
+    await refreshHistory();
     // switch back to source mode so user sees the new markdown
     setDraftMode("md");
     document.getElementById("draft-modal-text").value = art.draft;
@@ -941,6 +1017,7 @@ function openModal(topic) {
   ).join("");
   document.getElementById("modal").classList.remove("hidden");
   document.getElementById("modal").dataset.editId = topic?.id || "";
+  document.getElementById("modal").dataset.editPublic = topic?.is_public ? "1" : "0";
   document.getElementById("f-title").focus();
 }
 function closeModal() { document.getElementById("modal").classList.add("hidden"); }
@@ -954,14 +1031,15 @@ async function saveModal() {
   const editId = document.getElementById("modal").dataset.editId;
   try {
     if (editId) {
-      await api.patchTopic(parseInt(editId), { title, content_type, model, notes });
+      const ref = { id: parseInt(editId), is_public: document.getElementById("modal").dataset.editPublic === "1" };
+      await api.patchTopic(ref, { title, content_type, model, notes });
       await refreshTopics();
-      await openTopic(parseInt(editId));
+      await openTopic({ id: parseInt(editId), is_public: document.getElementById("modal").dataset.editPublic === "1" });
       toast("已保存");
     } else {
       const t = await api.createTopic({ title, content_type, model, notes });
       await refreshTopics();
-      await openTopic(t.id);
+      await openTopic(t);
       toast("已新建");
     }
     closeModal();
@@ -1071,7 +1149,7 @@ async function submitAuth() {
     showAuthState(session.user, session.is_admin);
     await refreshTopics();
     await refreshUsageBadge();
-    if (state.current) await openTopic(state.current.topic.id);
+    if (state.current) await openTopic(state.current.topic);
     toast(mode === "register" ? "注册成功" : "登录成功");
   } catch (e) {
     err.textContent = e.message;

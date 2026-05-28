@@ -3,8 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AI-Writer | 公众号写作台</title>
-  <meta name="theme-color" content="#d97706" />
+  <title>AI-Writer - 一键公众号写作排版工具</title>
+  <meta name="description" content="AI-Writer 是一个面向中文公众号作者的 AI 写作排版工具，支持选题、大纲、初稿生成和公众号样式预览。">
+  <meta name="keywords" content="AI写作,公众号写作,公众号排版,AI-Writer,写作工具">
   <link rel="icon" href="/static/favicon.svg?v=1" type="image/svg+xml" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
@@ -177,6 +178,14 @@
           </div>
           <textarea id="draft-modal-text" title="初稿" class="flex-1 w-full p-4 font-mono text-sm leading-relaxed resize-none outline-none"></textarea>
           <div id="draft-modal-preview" class="hidden flex-1 overflow-y-auto p-6 wx-preview theme-default"></div>
+          <!-- 历史版本 -->
+          <details id="history-panel" class="border-t border-amber-200 bg-orange-50/50 flex-shrink-0">
+            <summary class="px-3 py-2 text-xs text-stone-600 cursor-pointer flex items-center justify-between hover:bg-orange-50">
+              <span>历史版本 <span id="history-count" class="ml-1 text-amber-700"></span></span>
+              <span class="text-stone-400">点击展开</span>
+            </summary>
+            <ul id="history-list" class="max-h-44 overflow-y-auto text-xs divide-y divide-amber-100"></ul>
+          </details>
         </div>
         <aside class="w-96 flex flex-col flex-shrink-0">
           <div class="px-3 py-1.5 text-xs text-stone-600 border-b border-amber-200 bg-orange-50">AI 修改 · 基于初稿</div>
@@ -269,6 +278,6 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=37"></script>
+  <script src="/static/app.js?v=39"></script>
 </body>
 </html>

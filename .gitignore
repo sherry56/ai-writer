@@ -17,7 +17,9 @@ config/models.json
 
 # 数据
 data/db.sqlite
-data/db.sqlite-journal
+data/db.sqlite-*
+data/db.sqlite.legacy.*
+data/users/
 data/articles/*
 !data/articles/.gitkeep
 data/uploads/*
