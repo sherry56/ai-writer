@@ -407,7 +407,7 @@ function inlineStyles(root) {
     // display: only emit non-default values (skip default block / inline)
     const tag = el.tagName?.toLowerCase();
     const dsp = cs.getPropertyValue("display");
-    if (dsp === "inline-block" || dsp === "inline-flex" || dsp === "flex" || dsp === "table") {
+    if (dsp === "inline-block" || dsp === "inline-flex" || dsp === "flex") {
       parts.push(`display:${dsp}`);
     } else if (dsp === "block" && (tag === "img" || tag === "pre")) {
       // images/pre need explicit block so WeChat doesn't inline them
@@ -477,6 +477,19 @@ async function copyAsRichText() {
       // ensure code is transparent so pre bg shows fully
       code.style.background = "transparent";
       code.style.padding = "0";
+    });
+    // Center headings (h1/h2) that have a background — wrap each in a section with text-align:center.
+    // Use inline-block on the heading so its bg shrinks to text width.
+    clone.querySelectorAll("h1, h2, h3").forEach(h => {
+      const sty = h.getAttribute("style") || "";
+      const hasBg = /background-color\s*:\s*rgb|background-image\s*:\s*(?:linear|radial)/.test(sty);
+      if (!hasBg) return;
+      h.style.display = "inline-block";
+      h.style.maxWidth = "100%";
+      const wrap = document.createElement("section");
+      wrap.setAttribute("style", "text-align:center;margin:1em 0;");
+      h.parentNode.insertBefore(wrap, h);
+      wrap.appendChild(h);
     });
     convertToWechatSections(clone);
     // Wrap final HTML in <section data-tool="..."> (mirrors doocs/md output for WeChat)

@@ -40,7 +40,7 @@
 .theme-default { color: #444444; }
 .theme-default h1 { font-size: 16px; text-align: center; color: #1a202c; }
 .theme-default h2 {
-  font-size: 16px; color: #ffffff; display: table; margin-left: auto !important; margin-right: auto !important; text-align: center;
+  font-size: 16px; color: #ffffff; display: inline-block; max-width: 100%;
   background: #2563eb; padding: 4px 14px; border-radius: 4px;
 }
 .theme-default h3 { font-size: 16px; color: #1e40af; border-left: 3px solid #3b82f6; padding-left: 10px; }
@@ -66,7 +66,7 @@
   padding: 12px 16px; border-radius: 8px;
 }
 .theme-grace h2 {
-  font-size: 16px; color: #ffffff; display: table; margin-left: auto !important; margin-right: auto !important; text-align: center;
+  font-size: 16px; color: #ffffff; display: inline-block; max-width: 100%;
   background: linear-gradient(135deg, #7c3aed 0%, #c026d3 100%);
   padding: 4px 14px; border-radius: 4px;
 }
@@ -93,7 +93,7 @@
 .theme-simple h1 { font-size: 16px; text-align: center; color: #000000; }
 .theme-simple h2 {
   font-size: 16px; color: #000000; border-bottom: 2px solid #000000; padding-bottom: 4px;
-  display: table; margin-left: auto !important; margin-right: auto !important; text-align: center;
+  display: inline-block; max-width: 100%;
 }
 .theme-simple h3 { font-size: 16px; color: #000000; }
 .theme-simple h4 { font-size: 16px; color: #000000; }
@@ -114,7 +114,7 @@
 .theme-green { color: #3f3f3f; }
 .theme-green h1 { font-size: 16px; text-align: center; color: #064e3b; }
 .theme-green h2 {
-  font-size: 16px; color: #ffffff; display: table; margin-left: auto !important; margin-right: auto !important; text-align: center;
+  font-size: 16px; color: #ffffff; display: inline-block; max-width: 100%;
   background: #059669; padding: 4px 14px; border-radius: 4px;
 }
 .theme-green h3 { font-size: 16px; color: #047857; border-left: 3px solid #10b981; padding-left: 10px; }
