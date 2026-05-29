@@ -94,7 +94,7 @@ def draft_length_block(target: Optional[int]) -> str:
 
 
 _CN_DIGITS = "一二三四五六七八九十"
-_SUMMARY_WORDS = ("小结", "总结", "总而言之", "结语", "写在最后", "最后")
+_SUMMARY_WORDS = ("小结", "总结", "总而言之", "结语", "结尾", "收束", "收尾", "写在最后", "最后")
 
 
 def _strip_md_fence(text: str) -> str:
