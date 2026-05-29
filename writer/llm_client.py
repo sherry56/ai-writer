@@ -66,7 +66,12 @@ def _openai_chat(*, system: str, user: str, max_tokens: int, cfg: dict, model: s
         raise RuntimeError(f"模型 {model} 未配置 api_key")
     base_url = cfg.get("base_url") or None
     logger.info("[llm] openai-compatible %s base_url=%s", model, base_url or "default")
-    client = OpenAI(api_key=api_key, base_url=base_url)
+    # 一些第三方网关(如 packyapi)拒绝带 "OpenAI/Python" 的 UA,覆盖掉。
+    client = OpenAI(
+        api_key=api_key,
+        base_url=base_url,
+        default_headers={"User-Agent": "ai-writer/0.4"},
+    )
     resp = client.chat.completions.create(
         model=model,
         max_tokens=max_tokens,
