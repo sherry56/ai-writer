@@ -378,8 +378,9 @@ function bindEditor() {
   document.getElementById("btn-gen-draft").addEventListener("click", async (e) => {
     const outline = document.getElementById("ed-outline").value;
     if (!outline.trim()) { toast("请先生成或填写大纲"); return; }
-    await api.patchArticle(topic, { outline });
     await runWithSpinner(e.currentTarget, "生成中（可能 30-60s）...", async () => {
+      // save current outline first so backend reads the latest
+      await api.patchArticle(topic, { outline });
       const art = await api.genDraft(topic);
       state.current.article = art;
       await refreshTopics();
