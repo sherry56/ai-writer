@@ -41,8 +41,12 @@ def _anthropic_chat(*, system: str, user: str, max_tokens: int, cfg: dict, model
     api_key = cfg.get("api_key")
     if not api_key:
         raise RuntimeError(f"模型 {model} 未配置 api_key")
-    logger.info("[llm] anthropic %s", model)
-    client = anthropic.Anthropic(api_key=api_key)
+    base_url = cfg.get("base_url") or None  # None → 走 anthropic 官方
+    kwargs = {"api_key": api_key}
+    if base_url:
+        kwargs["base_url"] = base_url
+    logger.info("[llm] anthropic %s base_url=%s", model, base_url or "default")
+    client = anthropic.Anthropic(**kwargs)
     resp = client.messages.create(
         model=model,
         max_tokens=max_tokens,

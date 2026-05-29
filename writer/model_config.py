@@ -51,6 +51,8 @@ def _from_env_single() -> dict:
             entry["base_url"] = base
     else:
         entry["api_key"] = os.getenv("ANTHROPIC_API_KEY", "")
+        if base := os.getenv("ANTHROPIC_BASE_URL"):
+            entry["base_url"] = base
     return {"default": name, "models": [entry]}
 
 
