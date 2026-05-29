@@ -215,6 +215,7 @@ class TopicIn(BaseModel):
     content_type: ContentType = ContentType.PRODUCT_REVIEW
     notes: Optional[str] = None
     model: Optional[str] = Field(None, max_length=160)
+    target_length: Optional[int] = Field(None, ge=200, le=20000)
 
 
 class TopicPatch(BaseModel):
@@ -222,6 +223,7 @@ class TopicPatch(BaseModel):
     content_type: Optional[ContentType] = None
     notes: Optional[str] = None
     model: Optional[str] = Field(None, max_length=160)
+    target_length: Optional[int] = Field(None, ge=200, le=20000)
     status: Optional[TopicStatus] = None
 
 
@@ -246,6 +248,7 @@ class TopicOut(BaseModel):
     status: TopicStatus
     notes: Optional[str]
     model: str
+    target_length: Optional[int] = None
     is_public: bool = False
     created_at: datetime
     updated_at: datetime
@@ -262,6 +265,7 @@ class TopicOut(BaseModel):
             status=t.status,
             notes=t.notes,
             model=_topic_model(t.model),
+            target_length=t.target_length,
             is_public=is_public,
             created_at=t.created_at,
             updated_at=t.updated_at,
@@ -466,6 +470,7 @@ def _topic_routes(prefix: str, public: bool, write_dep) -> None:
             content_type=payload.content_type,
             notes=payload.notes,
             model=_topic_model(payload.model),
+            target_length=payload.target_length,
         )
         return TopicOut.from_orm_with_article(_load_topic(scope, t.id), is_public=public)
 

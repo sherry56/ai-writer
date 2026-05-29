@@ -231,6 +231,10 @@
           <select id="f-model" title="模型" class="mt-1 w-full border border-amber-200 rounded px-3 py-2 text-sm"></select>
         </label>
         <label class="block">
+          <span class="text-sm text-stone-700">目标字数(汉字,留空 = 默认 1500)</span>
+          <input id="f-length" type="number" min="200" max="20000" step="100" placeholder="1500" class="mt-1 w-full border border-amber-200 rounded px-3 py-2 text-sm" />
+        </label>
+        <label class="block">
           <span class="text-sm text-stone-700">备注 / 写作角度 / 素材（直接写在这里，作为唯一素材送给模型）</span>
           <textarea id="f-notes" rows="10" class="mt-1 w-full border border-amber-200 rounded px-3 py-2 text-sm font-mono"></textarea>
         </label>
@@ -278,6 +282,6 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=40"></script>
+  <script src="/static/app.js?v=41"></script>
 </body>
 </html>

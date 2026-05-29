@@ -1004,6 +1004,7 @@ function openModal(topic) {
   document.getElementById("modal-title").textContent = topic ? "编辑选题" : "新建选题";
   document.getElementById("f-title").value = topic?.title || "";
   document.getElementById("f-notes").value = topic?.notes || "";
+  document.getElementById("f-length").value = topic?.target_length || "";
   const sel = document.getElementById("f-type");
   sel.innerHTML = state.templates.map(t =>
     `<option value="${t.value}" ${topic?.content_type===t.value?'selected':''}>${t.label}</option>`
@@ -1028,17 +1029,19 @@ async function saveModal() {
   const content_type = document.getElementById("f-type").value;
   const model = document.getElementById("f-model").value;
   const notes = document.getElementById("f-notes").value;
+  const lengthRaw = document.getElementById("f-length").value.trim();
+  const target_length = lengthRaw ? parseInt(lengthRaw, 10) : null;
   if (!title) { toast("请填标题"); return; }
   const editId = document.getElementById("modal").dataset.editId;
   try {
     if (editId) {
       const ref = { id: parseInt(editId), is_public: document.getElementById("modal").dataset.editPublic === "1" };
-      await api.patchTopic(ref, { title, content_type, model, notes });
+      await api.patchTopic(ref, { title, content_type, model, notes, target_length });
       await refreshTopics();
       await openTopic({ id: parseInt(editId), is_public: document.getElementById("modal").dataset.editPublic === "1" });
       toast("已保存");
     } else {
-      const t = await api.createTopic({ title, content_type, model, notes });
+      const t = await api.createTopic({ title, content_type, model, notes, target_length });
       await refreshTopics();
       await openTopic(t);
       toast("已新建");

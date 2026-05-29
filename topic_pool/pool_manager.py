@@ -50,6 +50,7 @@ def create_topic(
     notes: Optional[str] = None,
     status: TopicStatus = TopicStatus.DRAFT,
     model: Optional[str] = None,
+    target_length: Optional[int] = None,
 ) -> Topic:
     with get_session(scope) as s:
         owner_label = PUBLIC_OWNER if scope == PUBLIC_SCOPE else scope
@@ -60,6 +61,7 @@ def create_topic(
             status=_db_value(status),
             owner=owner_label,
             model=model,
+            target_length=target_length,
         )
         s.add(topic)
         s.flush()
@@ -68,7 +70,7 @@ def create_topic(
 
 
 def update_topic(topic_id: int, scope: str, **fields) -> Optional[Topic]:
-    ALLOWED = {"title", "content_type", "notes", "model"}
+    ALLOWED = {"title", "content_type", "notes", "model", "target_length"}
     bad = set(fields) - ALLOWED
     if bad:
         raise ValueError(f"不允许通过 update_topic 修改的字段:{bad}(请用 set_status)")

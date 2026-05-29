@@ -61,6 +61,7 @@ class Topic(Base):
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     owner: Mapped[str] = mapped_column(String(64), nullable=False, default="admin", index=True)
     model: Mapped[Optional[str]] = mapped_column(String(160), nullable=True)
+    target_length: Mapped[Optional[int]] = mapped_column(nullable=True)  # 目标正文字数(汉字)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

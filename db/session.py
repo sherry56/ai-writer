@@ -97,6 +97,11 @@ def _ensure_scope_engine(scope: str):
     path.parent.mkdir(parents=True, exist_ok=True)
     engine = _make_engine(f"sqlite:///{path.as_posix()}")
     _per_user_metadata().create_all(bind=engine)
+    # Auto-add columns that older content.sqlite files don't have
+    with engine.begin() as conn:
+        cols = [r[1] for r in conn.exec_driver_sql("PRAGMA table_info(topics)").fetchall()]
+        if cols and "target_length" not in cols:
+            conn.exec_driver_sql("ALTER TABLE topics ADD COLUMN target_length INTEGER")
     _engines[scope] = engine
     _session_factories[scope] = sessionmaker(
         bind=engine, autoflush=False, autocommit=False, expire_on_commit=False, future=True,
