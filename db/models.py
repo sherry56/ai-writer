@@ -136,6 +136,8 @@ class UserUsage(Base):
     __tablename__ = "user_usage"
     username: Mapped[str] = mapped_column(String(64), primary_key=True)
     count: Mapped[int] = mapped_column(default=0, nullable=False)
+    period_start: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    extra_quota: Mapped[int] = mapped_column(default=0, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )

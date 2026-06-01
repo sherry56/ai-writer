@@ -19,6 +19,7 @@ import json
 import logging
 import os
 import secrets
+import threading
 from pathlib import Path
 from typing import Optional
 
@@ -31,6 +32,7 @@ ROOT = Path(__file__).resolve().parent.parent
 USERS_FILE = ROOT / "config" / "users.json"
 
 SESSION_COOKIE = "ai_writer_session"
+_USERS_LOCK = threading.Lock()
 
 
 def get_session_secret() -> str:
@@ -76,17 +78,24 @@ def authenticate(username: str, password: str) -> Optional[str]:
     """验证账户密码,返回规范化的用户名(或 None)。"""
     if not username or not password:
         return None
+    username = username.strip()
     users = _load_users()
-    stored = users.get(username)
+    canonical = username if username in users else username.lower()
+    stored = users.get(canonical)
     if stored is None:
         return None
     if _verify(password, stored):
-        return username
+        return canonical
     return None
 
 
 def current_user(request: Request) -> Optional[str]:
     return request.session.get("user")
+
+
+def list_usernames() -> list[str]:
+    """返回当前配置中的用户名,不暴露密码或哈希。"""
+    return sorted(_load_users().keys())
 
 
 def require_user(request: Request) -> str:
@@ -105,17 +114,19 @@ def register_user(username: str, password: str) -> tuple[bool, str]:
     """新注册用户写入 config/users.json,密码自动 bcrypt 哈希。
     返回 (success, message)。"""
     import re as _re
-    username = (username or "").strip()
+    username = (username or "").strip().lower()
     if not _re.match(r"^[A-Za-z0-9_\-]{2,32}$", username):
         return False, "用户名只能用字母/数字/_/-,长度 2-32"
     if not password or len(password) < 6:
         return False, "密码至少 6 位"
-    users = _load_users()
-    if username in users:
-        return False, "用户名已存在"
-    users[username] = hash_password(password)
-    USERS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    payload = {"users": users}
-    USERS_FILE.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    with _USERS_LOCK:
+        users = _load_users()
+        used_ids = {name.strip().lower() for name in users}
+        if username in used_ids:
+            return False, "用户ID已存在，不能重复注册"
+        users[username] = hash_password(password)
+        USERS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        payload = {"users": users}
+        USERS_FILE.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     logger.info("registered user: %s", username)
     return True, "ok"

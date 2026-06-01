@@ -139,7 +139,7 @@ data/
 ├── db.sqlite                         # 共享元数据,所有跨用户表都带 owner 列
 │   ├── topics(owner)                 # 选题:WHERE owner = 当前登录用户 OR owner = '*'
 │   ├── articles(topic_id → topics)   # 文章:跟随 topic.owner 间接隔离
-│   └── user_usage(username)          # 每用户免费次数
+│   └── user_usage(username)          # 每用户每周 10 次免费额度(周一 0 点刷新)+管理员充值余额
 ├── articles/
 │   ├── public/                       # owner='*' 的公开示例(README.md 同步)
 │   ├── sherry/                       # 管理员落盘的 .md 初稿

@@ -37,6 +37,7 @@
           <span class="text-stone-300">/</span>
           <button type="button" id="btn-register" class="text-amber-700 hover:underline">注册</button>
         </span>
+        <button type="button" id="btn-quota-admin" class="hidden text-amber-700 hover:underline">额度管理</button>
       </div>
     </header>
 
@@ -268,6 +269,37 @@
     </div>
   </div>
 
+  <!-- 管理员：用户额度管理 -->
+  <div id="quota-modal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg shadow-xl w-[820px] max-h-[90vh] flex flex-col">
+      <div class="px-5 py-3 border-b border-amber-200 flex items-center justify-between">
+        <div class="font-medium text-amber-800">用户额度管理</div>
+        <button type="button" id="quota-close" class="text-stone-500 hover:text-stone-800">✕</button>
+      </div>
+      <div class="p-5 space-y-3 overflow-y-auto">
+        <div class="flex items-center justify-between text-xs text-stone-500">
+          <span id="quota-summary">每周免费 10 次</span>
+          <button type="button" id="quota-refresh" class="btn">刷新</button>
+        </div>
+        <div class="overflow-x-auto border border-amber-200 rounded">
+          <table class="w-full text-sm">
+            <thead class="bg-orange-50 text-stone-600">
+              <tr>
+                <th class="text-left font-medium px-3 py-2">用户</th>
+                <th class="text-left font-medium px-3 py-2">本周已用</th>
+                <th class="text-left font-medium px-3 py-2">本周剩余</th>
+                <th class="text-left font-medium px-3 py-2">充值余额</th>
+                <th class="text-left font-medium px-3 py-2 w-44">充值</th>
+              </tr>
+            </thead>
+            <tbody id="quota-list" class="divide-y divide-amber-100"></tbody>
+          </table>
+        </div>
+        <p id="quota-empty" class="hidden text-sm text-stone-400 text-center py-6">暂无用户</p>
+      </div>
+    </div>
+  </div>
+
   <!-- 联系我们 -->
   <div id="contact-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-lg shadow-2xl w-[420px] max-h-[90vh] flex flex-col">
@@ -282,6 +314,6 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=41"></script>
+  <script src="/static/app.js?v=42"></script>
 </body>
 </html>

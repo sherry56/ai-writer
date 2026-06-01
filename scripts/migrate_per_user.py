@@ -150,7 +150,13 @@ def main(apply: bool) -> int:
         NewSession = sessionmaker(bind=new_engine, autoflush=False, autocommit=False, expire_on_commit=False, future=True)
         with NewSession() as s:
             for u in usage_rows:
-                s.add(UserUsage(username=u.username, count=u.count, updated_at=u.updated_at))
+                s.add(UserUsage(
+                    username=u.username,
+                    count=u.count,
+                    period_start=getattr(u, "period_start", None),
+                    extra_quota=getattr(u, "extra_quota", 0),
+                    updated_at=u.updated_at,
+                ))
             s.commit()
         log.info("迁移完成。请检查 data/users/<scope>/content.sqlite")
     return 0

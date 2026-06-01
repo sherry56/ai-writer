@@ -39,10 +39,18 @@ from web.auth import (
     authenticate,
     current_user,
     get_session_secret,
+    list_usernames,
     register_user,
     require_user,
 )
-from web.usage import FREE_LIMIT, enforce_and_increment, remaining as usage_remaining
+from web.usage import (
+    FREE_LIMIT,
+    add_extra_quota,
+    enforce_and_increment,
+    list_usage_status,
+    next_reset_at_iso,
+    usage_status,
+)
 from writer import TEMPLATES, generate_draft, generate_outline, generate_revision
 from writer.llm_client import get_model
 
@@ -241,6 +249,10 @@ class LoginIn(BaseModel):
     password: str = Field(..., min_length=1, max_length=200)
 
 
+class QuotaAddIn(BaseModel):
+    amount: int = Field(..., ge=1, le=100000)
+
+
 class TopicOut(BaseModel):
     id: int
     title: str
@@ -389,17 +401,39 @@ def api_logout(request: Request) -> dict:
 
 @app.post("/api/register")
 def api_register(payload: LoginIn, request: Request) -> dict:
-    ok, msg = register_user(payload.username, payload.password)
+    username = payload.username.strip().lower()
+    ok, msg = register_user(username, payload.password)
     if not ok:
         raise HTTPException(400, msg)
-    request.session["user"] = payload.username
-    return {"user": payload.username, "is_admin": is_admin_user(payload.username)}
+    request.session["user"] = username
+    return {"user": username, "is_admin": is_admin_user(username)}
 
 
 @app.get("/api/usage")
 def api_usage(user: str = Depends(require_user)) -> dict:
-    rem = usage_remaining(user)
-    return {"limit": FREE_LIMIT, "unlimited": rem is None, "remaining": rem}
+    return usage_status(user)
+
+
+@app.get("/api/admin/quotas")
+def api_admin_quotas(user: str = Depends(require_admin)) -> dict:
+    users = list_usernames()
+    return {
+        "limit": FREE_LIMIT,
+        "period": "weekly",
+        "reset_at": next_reset_at_iso(),
+        "admin": user,
+        "users": list_usage_status(users),
+    }
+
+
+@app.post("/api/admin/quotas/{username}/add")
+def api_admin_quota_add(username: str, payload: QuotaAddIn, user: str = Depends(require_admin)) -> dict:
+    users = set(list_usernames())
+    if username not in users:
+        raise HTTPException(404, "用户不存在")
+    if is_admin_user(username):
+        raise HTTPException(400, "管理员账号不限次数,无需充值")
+    return add_extra_quota(username, payload.amount)
 
 
 @app.get("/api/contact")

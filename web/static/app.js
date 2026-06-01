@@ -23,6 +23,8 @@ const api = {
   register: (username, password) => api.req("POST", "/api/register", { username, password }),
   logout: () => api.req("POST", "/api/logout"),
   usage: () => api.req("GET", "/api/usage"),
+  adminQuotas: () => api.req("GET", "/api/admin/quotas"),
+  addQuota: (username, amount) => api.req("POST", `/api/admin/quotas/${encodeURIComponent(username)}/add`, { amount }),
   contact: () => api.req("GET", "/api/contact"),
   // public-aware paths: pass topic object (with is_public) or {id, is_public}
   _scope: (t) => (t && t.is_public ? "/public" : ""),
@@ -1062,7 +1064,9 @@ async function refreshUsageBadge() {
       el.textContent = "无限次";
       el.className = "text-xs px-2 py-0.5 rounded bg-green-100 border border-green-300 text-green-800";
     } else {
-      el.textContent = `剩余 ${u.remaining}/${u.limit} 次`;
+      el.textContent = u.extra_quota > 0
+        ? `本周剩余 ${u.weekly_remaining}/${u.limit} 次 · 充值 ${u.extra_quota} 次`
+        : `本周剩余 ${u.remaining}/${u.limit} 次`;
       const danger = u.remaining <= 0;
       el.className = `text-xs px-2 py-0.5 rounded border ${danger ? 'bg-red-50 border-red-200 text-red-700' : 'bg-orange-100 border-amber-200 text-stone-700'}`;
     }
@@ -1088,17 +1092,106 @@ function closeContactModal() {
   document.getElementById("contact-modal").classList.add("hidden");
 }
 
+function formatQuotaTime(iso) {
+  if (!iso) return "";
+  const dt = new Date(iso);
+  if (Number.isNaN(dt.getTime())) return iso;
+  return dt.toLocaleString("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
+async function openQuotaModal() {
+  if (!state.isAdmin) return;
+  document.getElementById("quota-modal").classList.remove("hidden");
+  await refreshQuotaAdmin();
+}
+
+function closeQuotaModal() {
+  document.getElementById("quota-modal").classList.add("hidden");
+}
+
+async function refreshQuotaAdmin() {
+  const list = document.getElementById("quota-list");
+  const empty = document.getElementById("quota-empty");
+  const summary = document.getElementById("quota-summary");
+  list.innerHTML = `<tr><td colspan="5" class="px-3 py-6 text-center text-stone-400">加载中...</td></tr>`;
+  empty.classList.add("hidden");
+  try {
+    const data = await api.adminQuotas();
+    summary.textContent = `每周免费 ${data.limit} 次 · 下次刷新 ${formatQuotaTime(data.reset_at)}`;
+    const users = data.users || [];
+    if (!users.length) {
+      list.innerHTML = "";
+      empty.classList.remove("hidden");
+      return;
+    }
+    list.innerHTML = users.map(u => {
+      const admin = u.unlimited;
+      const rowClass = admin ? "bg-stone-50 text-stone-400" : "bg-white";
+      const remaining = admin ? "不限" : `${u.weekly_remaining}/${u.limit}`;
+      const action = admin
+        ? `<span class="text-xs text-stone-400">无需充值</span>`
+        : `<div class="flex items-center gap-2">
+             <input type="number" min="1" step="1" value="10"
+               class="quota-amount w-20 border border-amber-200 rounded px-2 py-1 text-sm" />
+             <button type="button" class="quota-add btn btn-primary" data-user="${escapeHtml(u.username)}">充值</button>
+           </div>`;
+      return `<tr class="${rowClass}">
+        <td class="px-3 py-2">
+          <span class="font-medium">${escapeHtml(u.username)}</span>
+          ${admin ? `<span class="ml-2 text-xs text-stone-400">管理员</span>` : ""}
+        </td>
+        <td class="px-3 py-2">${admin ? "-" : `${u.weekly_used}/${u.limit}`}</td>
+        <td class="px-3 py-2">${remaining}</td>
+        <td class="px-3 py-2">${admin ? "-" : `${u.extra_quota || 0} 次`}</td>
+        <td class="px-3 py-2">${action}</td>
+      </tr>`;
+    }).join("");
+  } catch (e) {
+    list.innerHTML = `<tr><td colspan="5" class="px-3 py-6 text-center text-red-600">加载失败：${escapeHtml(e.message)}</td></tr>`;
+  }
+}
+
+async function addQuotaFromRow(btn) {
+  const row = btn.closest("tr");
+  const input = row?.querySelector(".quota-amount");
+  const amount = parseInt(input?.value || "0", 10);
+  const username = btn.dataset.user;
+  if (!username || !Number.isFinite(amount) || amount <= 0) {
+    toast("请输入有效的充值次数");
+    return;
+  }
+  btn.disabled = true;
+  try {
+    await api.addQuota(username, amount);
+    await refreshQuotaAdmin();
+    if (username === state.user) await refreshUsageBadge();
+    toast(`已给 ${username} 充值 ${amount} 次`);
+  } catch (e) {
+    toast("充值失败：" + e.message, 5000);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 function showAuthState(user, isAdmin = false) {
   state.user = user || null;
   state.isAdmin = !!isAdmin;
   const badge = document.getElementById("user-badge");
   const auth = document.getElementById("auth-buttons");
+  const quotaBtn = document.getElementById("btn-quota-admin");
   const newBtn = document.getElementById("btn-new");
   if (user) {
     document.getElementById("user-name").textContent = user;
     badge.classList.remove("hidden");
     auth.classList.add("hidden");
     auth.classList.remove("flex");
+    if (quotaBtn) quotaBtn.classList.toggle("hidden", !isAdmin);
     if (newBtn) {
       newBtn.disabled = false;
       newBtn.textContent = "+ 新建选题";
@@ -1107,6 +1200,7 @@ function showAuthState(user, isAdmin = false) {
     badge.classList.add("hidden");
     auth.classList.remove("hidden");
     auth.classList.add("flex");
+    if (quotaBtn) quotaBtn.classList.add("hidden");
     if (newBtn) {
       newBtn.disabled = false;
       newBtn.textContent = "+ 新建选题";
@@ -1178,6 +1272,7 @@ async function init() {
   document.getElementById("btn-logout").addEventListener("click", async () => {
     await api.logout();
     state.current = null; state.topics = [];
+    closeQuotaModal();
     showAuthState(null, false);
     await refreshTopics();
     await openPublicExample();
@@ -1189,6 +1284,16 @@ async function init() {
   document.getElementById("contact-close").addEventListener("click", closeContactModal);
   document.getElementById("contact-modal").addEventListener("click", (e) => {
     if (e.target.id === "contact-modal") closeContactModal();
+  });
+  document.getElementById("btn-quota-admin").addEventListener("click", openQuotaModal);
+  document.getElementById("quota-close").addEventListener("click", closeQuotaModal);
+  document.getElementById("quota-refresh").addEventListener("click", refreshQuotaAdmin);
+  document.getElementById("quota-modal").addEventListener("click", (e) => {
+    if (e.target.id === "quota-modal") closeQuotaModal();
+  });
+  document.getElementById("quota-list").addEventListener("click", (e) => {
+    const btn = e.target.closest(".quota-add");
+    if (btn) addQuotaFromRow(btn);
   });
 
   // detect current session

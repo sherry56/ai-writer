@@ -111,7 +111,20 @@ def _ensure_scope_engine(scope: str):
 
 # Shared engine for cross-user tables (UserUsage)
 _shared_engine = _make_engine(f"sqlite:///{SHARED_DB_PATH.as_posix()}")
-_shared_metadata().create_all(bind=_shared_engine)
+
+
+def _ensure_shared_schema() -> None:
+    """Create shared tables and lazily add columns for older db.sqlite files."""
+    _shared_metadata().create_all(bind=_shared_engine)
+    with _shared_engine.begin() as conn:
+        cols = [r[1] for r in conn.exec_driver_sql("PRAGMA table_info(user_usage)").fetchall()]
+        if cols and "period_start" not in cols:
+            conn.exec_driver_sql("ALTER TABLE user_usage ADD COLUMN period_start DATETIME")
+        if cols and "extra_quota" not in cols:
+            conn.exec_driver_sql("ALTER TABLE user_usage ADD COLUMN extra_quota INTEGER NOT NULL DEFAULT 0")
+
+
+_ensure_shared_schema()
 _SharedSession = sessionmaker(
     bind=_shared_engine, autoflush=False, autocommit=False, expire_on_commit=False, future=True,
 )
@@ -119,7 +132,7 @@ _SharedSession = sessionmaker(
 
 def init_db() -> None:
     """启动时调用一次,保证共享库 + 公开示例库存在(各用户库按需懒加载)。"""
-    _shared_metadata().create_all(bind=_shared_engine)
+    _ensure_shared_schema()
     _ensure_scope_engine(PUBLIC_SCOPE)
 
 
