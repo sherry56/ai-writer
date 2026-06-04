@@ -585,6 +585,123 @@ function convertToWechatSections(root) {
   });
 }
 
+// ===== WeChat-friendly DOM transforms (借鉴 oaker-io/wewrite) =====
+
+// 1) 把 <a href="http..."> 改成 「文字[1]」+ 文末「参考链接」一节
+function transformLinksToFootnotes(root) {
+  const links = [...root.querySelectorAll("a[href]")].filter(a => /^https?:/i.test(a.getAttribute("href") || ""));
+  if (!links.length) return;
+  const refs = [];
+  links.forEach((a, i) => {
+    const url = a.getAttribute("href");
+    const text = (a.textContent || url).trim();
+    refs.push({ text, url });
+    const frag = document.createDocumentFragment();
+    frag.appendChild(document.createTextNode(text));
+    const sup = document.createElement("sup");
+    sup.setAttribute("style", "color:#576b95;font-size:0.78em;margin:0 2px;");
+    sup.textContent = `[${i + 1}]`;
+    frag.appendChild(sup);
+    a.parentNode.replaceChild(frag, a);
+  });
+  const refSec = document.createElement("section");
+  refSec.setAttribute("style", "margin-top:1.8em;padding-top:0.8em;border-top:1px dashed #cbd5e1;font-size:0.85em;color:#64748b;");
+  const title = document.createElement("section");
+  title.setAttribute("style", "font-weight:600;color:#475569;margin-bottom:0.4em;");
+  title.textContent = "参考链接";
+  refSec.appendChild(title);
+  refs.forEach((r, i) => {
+    const item = document.createElement("section");
+    item.setAttribute("style", "margin:0.25em 0;line-height:1.6;word-break:break-all;");
+    item.textContent = `[${i + 1}] ${r.text} — ${r.url}`;
+    refSec.appendChild(item);
+  });
+  root.appendChild(refSec);
+}
+
+// 2) 中英 / 中数字之间自动加空格
+function fixCjkLatinSpacing(root) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+  const re1 = /([一-龥])([A-Za-z0-9])/g;
+  const re2 = /([A-Za-z0-9])([一-龥])/g;
+  const nodes = [];
+  let n;
+  while ((n = walker.nextNode())) nodes.push(n);
+  nodes.forEach(node => {
+    if (node.parentNode && /^(CODE|PRE|SCRIPT|STYLE)$/.test(node.parentNode.tagName)) return;
+    const out = node.nodeValue.replace(re1, "$1 $2").replace(re2, "$1 $2");
+    if (out !== node.nodeValue) node.nodeValue = out;
+  });
+}
+
+// 3) 把 <strong>/<b> 末尾的中英文标点移出标签外
+function fixBoldPunctuation(root) {
+  const PUNCT = /[。，、；：！？.,;:!?…]+$/;
+  root.querySelectorAll("strong, b").forEach(el => {
+    const last = el.lastChild;
+    if (!last || last.nodeType !== 3) return; // text node only
+    const m = PUNCT.exec(last.nodeValue);
+    if (!m) return;
+    const tail = m[0];
+    last.nodeValue = last.nodeValue.slice(0, -tail.length);
+    el.parentNode.insertBefore(document.createTextNode(tail), el.nextSibling);
+  });
+}
+
+// 5) 把所有 <img src="/uploads/..."> 等本地/相对路径转 base64 内嵌,
+// 否则 WeChat 编辑器拿不到图(下载失败 → 图被丢弃)。
+async function inlineImagesAsDataURLs(root) {
+  const imgs = [...root.querySelectorAll("img")];
+  if (!imgs.length) return;
+  await Promise.all(imgs.map(async img => {
+    let src = img.getAttribute("src") || "";
+    if (!src) return;
+    if (src.startsWith("data:")) return;     // 已经是 data URL
+    // 公网 https URL 也强制转成 base64 以保证 WeChat 100% 收到(避免它下载失败)
+    try {
+      const resolved = new URL(src, location.href).toString();
+      const resp = await fetch(resolved, { credentials: "same-origin" });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const blob = await resp.blob();
+      const dataUrl = await new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(r.result);
+        r.onerror = () => rej(r.error);
+        r.readAsDataURL(blob);
+      });
+      img.setAttribute("src", dataUrl);
+    } catch (e) {
+      console.warn("inline image failed:", src, e);
+    }
+  }));
+}
+
+// 4) <ul>/<ol> 转成手动加点 / 编号的 <section>,WeChat 不再吃缩进
+function listsToSections(root) {
+  const transformList = (list, ordered) => {
+    const wrap = document.createElement("section");
+    wrap.setAttribute("style", "margin:0.8em 0;");
+    let idx = 1;
+    [...list.children].forEach(li => {
+      if (li.tagName !== "LI") return;
+      const row = document.createElement("section");
+      const marker = ordered ? `${idx}. ` : "• ";
+      row.setAttribute("style", "padding-left:1.5em;text-indent:-1.5em;margin:0.25em 0;line-height:1.75;");
+      row.innerHTML = `<span style="color:#3b82f6;${ordered ? 'font-weight:600;' : ''}">${marker}</span>${li.innerHTML}`;
+      wrap.appendChild(row);
+      idx++;
+    });
+    list.parentNode.replaceChild(wrap, list);
+  };
+  // process deepest first so nested lists work
+  let lists;
+  do {
+    lists = [...root.querySelectorAll("ol, ul")].filter(l => !l.querySelector("ol, ul"));
+    lists.forEach(l => transformList(l, l.tagName === "OL"));
+  } while (lists.length);
+}
+
+
 async function copyAsRichText() {
   const src = document.getElementById("preview-content");
   if (!src || !src.innerHTML.trim()) { toast("没有可复制的内容"); return; }
@@ -601,6 +718,13 @@ async function copyAsRichText() {
   wrapper.appendChild(clone);
   document.body.appendChild(wrapper);
   try {
+    // WeChat 适配后处理(参考 oaker-io/wewrite):
+    listsToSections(clone);        // list → 手动编号 section,避免缩进吃掉
+    fixBoldPunctuation(clone);     // <strong>foo。</strong> → <strong>foo</strong>。
+    fixCjkLatinSpacing(clone);     // 中英自动加空格
+    transformLinksToFootnotes(clone);  // <a> → 上标 [n] + 文末参考链接
+    await inlineImagesAsDataURLs(clone);  // <img src="/uploads/..."> → data:image/png;base64,...
+
     inlineStyles(clone);
     // WeChat strips <code> bg/color; lift them onto <pre> wrapper so the dark/light
     // code-theme block survives. Wrap in a <section> for extra safety.
@@ -619,18 +743,27 @@ async function copyAsRichText() {
       code.style.background = "transparent";
       code.style.padding = "0";
     });
-    // Center headings (h1/h2) that have a background — wrap each in a section with text-align:center.
-    // Use inline-block on the heading so its bg shrinks to text width.
+    // WeChat 强制把 <h2>/<h1> 渲染为 block-level,inline-block 会被忽略 → 标题占满一行。
+    // 解决:把带背景的标题整段替换成 <section text-align:center><span 胶囊样式>
+    // span 是天生的 inline 元素,WeChat 不会把它撑满。
     clone.querySelectorAll("h1, h2").forEach(h => {
       const sty = h.getAttribute("style") || "";
       const hasBg = /background-color\s*:\s*rgb|background-image\s*:\s*(?:linear|radial)/.test(sty);
       if (!hasBg) return;
-      h.style.display = "inline-block";
-      h.style.maxWidth = "100%";
+      // 标题内容(可能含嵌套 <strong> 等)
+      const innerHTML = h.innerHTML;
+      // 复制原来 h 的所有样式到 span,再补充强制内联
+      const spanStyle = (sty || "")
+        .replace(/display\s*:[^;]+;?/gi, "")
+        .replace(/margin(?:-top|-bottom|-left|-right)?\s*:[^;]+;?/gi, "")
+        + ";display:inline-block;max-width:100%;white-space:normal;word-break:break-word;";
       const wrap = document.createElement("section");
-      wrap.setAttribute("style", "text-align:center;margin:1em 0;");
-      h.parentNode.insertBefore(wrap, h);
-      wrap.appendChild(h);
+      wrap.setAttribute("style", "text-align:center;margin:1em 0;line-height:1.4;");
+      const span = document.createElement("span");
+      span.setAttribute("style", spanStyle);
+      span.innerHTML = innerHTML;
+      wrap.appendChild(span);
+      h.parentNode.replaceChild(wrap, h);
     });
     convertToWechatSections(clone);
     // Wrap final HTML in <section data-tool="..."> (mirrors doocs/md output for WeChat)
