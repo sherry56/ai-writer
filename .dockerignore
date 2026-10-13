@@ -5,7 +5,12 @@ __pycache__
 *.pyc
 *.pyo
 .env
+.env.*
+config/users.json
+config/models.json
 data/db.sqlite
+data/db.sqlite-*
+data/users/
 data/articles/*
 !data/articles/.gitkeep
 data/uploads/*

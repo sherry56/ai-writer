@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hmac
 import logging
 import os
 import re
@@ -51,6 +52,7 @@ from web.usage import (
     next_reset_at_iso,
     usage_status,
 )
+from web.cloudflare_state import create_state_archive, restore_state_archive
 from writer import TEMPLATES, generate_draft, generate_outline, generate_revision
 from writer.llm_client import get_model
 
@@ -93,7 +95,7 @@ app.add_middleware(
     secret_key=get_session_secret(),
     session_cookie=SESSION_COOKIE,
     same_site="lax",
-    https_only=False,
+    https_only=os.getenv("SESSION_COOKIE_SECURE", "false").strip().lower() in {"1", "true", "yes"},
     max_age=60 * 60 * 24 * 30,
 )
 
@@ -680,6 +682,51 @@ async def api_upload_image(file: UploadFile = File(...), user: str = Depends(req
     rel = out.relative_to(ROOT).as_posix()
     logger.info("uploaded image %s (%d bytes) for %s", rel, len(data), user)
     return {"url": f"/uploads/{user_dir.name}/{out.name}", "path": rel, "size": len(data)}
+
+
+# ===== Cloudflare Container state backup (private Worker-to-container routes) =====
+
+def _require_internal_state_token(request: Request) -> None:
+    expected = os.getenv("INTERNAL_BACKUP_TOKEN", "")
+    supplied = request.headers.get("x-ai-writer-internal-token", "")
+    if not expected or not hmac.compare_digest(expected, supplied):
+        raise HTTPException(404, "Not found")
+
+
+@app.get("/_internal/state/health")
+def internal_state_health(request: Request) -> dict:
+    _require_internal_state_token(request)
+    return {"ok": True}
+
+
+@app.get("/_internal/state/export")
+def internal_state_export(request: Request) -> Response:
+    _require_internal_state_token(request)
+    return Response(
+        content=create_state_archive(),
+        media_type="application/gzip",
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+@app.post("/_internal/state/import")
+async def internal_state_import(request: Request) -> dict:
+    _require_internal_state_token(request)
+    length = request.headers.get("content-length")
+    if length:
+        try:
+            if int(length) > 40 * 1024 * 1024:
+                raise HTTPException(413, "State archive is too large")
+        except ValueError as error:
+            raise HTTPException(400, "Invalid Content-Length") from error
+    payload = await request.body()
+    if len(payload) > 40 * 1024 * 1024:
+        raise HTTPException(413, "State archive is too large")
+    try:
+        restore_state_archive(payload)
+    except ValueError as error:
+        raise HTTPException(400, str(error)) from error
+    return {"ok": True}
 
 
 # ===== Static =====
