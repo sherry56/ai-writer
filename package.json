@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "deploy:cloudflare": "wrangler deploy"
+    "deploy:pages": "wrangler pages deploy ./web/static --project-name ai-writer"
   },
   "devDependencies": {
     "wrangler": "4.149.0"

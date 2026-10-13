@@ -177,17 +177,12 @@ python -m web.tools.hashpw "my-new-password"
 - 定时调度
 - 物理多库(目前所有用户共用 db.sqlite,通过 owner 列隔离;若需绝对隔离可后续切到 per-user SQLite 文件)
 
-## Cloudflare Containers 部署
+## Cloudflare Pages 静态部署
 
-生产入口为 `https://writer.huibara.cn`。使用 Cloudflare Workers Builds 连接 GitHub 仓库，在生产分支 `main` 上执行 `npx wrangler deploy`；Cloudflare 会在构建环境中构建 Dockerfile，不需要在仓库保存 Cloudflare API token。首次连接需要在 Cloudflare 控制台授权 GitHub App 访问 `sherry56/ai-writer` 仓库。Cloudflare Containers 需要 Workers Paid 账户。
-
-容器文件系统会在容器重启时重建。Worker 因此把 `data/` 中的 SQLite、文章、上传图片和风格库，以及 `config/users.json` 存入 Durable Object SQLite，并在启动时恢复。模型 API key、会话密钥和内部令牌通过 Wrangler secrets 注入，不放进镜像或 Git。首次迁移现有站点时：
+Cloudflare Pages 目前只发布 `web/static/` 前端。线上地址：`https://ai-writer-c5p.pages.dev`。部署命令：
 
 ```bash
-python scripts/export_cloudflare_state.py
-python scripts/prepare_cloudflare_secrets.py
-npx wrangler secret bulk .cloudflare-secrets.json
-python scripts/seed_cloudflare_state.py
+npm run deploy:pages
 ```
 
-`cloudflare-state.tar.gz` 和 `.cloudflare-secrets.json` 都是本地私密文件，已加入 `.gitignore`。先在 Wrangler 登录状态下执行 `npx wrangler secret bulk .cloudflare-secrets.json` 设置运行时密钥，再运行状态上传脚本。首次部署及首次状态上传后应验证登录、文章、图片和模型调用，再把主页入口切换到新域名。
+当前部署不包含 FastAPI 后端，因此登录、注册、AI 生成、数据存取和图片上传等 `/api/*` 功能暂不可用；本地 FastAPI 运行方式仍见上文。`writer.huibara.cn` 自定义域名尚待绑定。
