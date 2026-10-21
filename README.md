@@ -179,10 +179,10 @@ python -m web.tools.hashpw "my-new-password"
 
 ## Cloudflare Pages 静态部署
 
-Cloudflare Pages 目前只发布 `web/static/` 前端。线上地址：`https://ai-writer-c5p.pages.dev`。部署命令：
+Cloudflare Pages 目前只发布 `web/static/` 前端。线上地址：`https://writer.huibara.cn`（Pages 备用域名：`https://ai-writer-c5p.pages.dev`）。部署命令：
 
 ```bash
 npm run deploy:pages
 ```
 
-当前部署不包含 FastAPI 后端，因此登录、注册、AI 生成、数据存取和图片上传等 `/api/*` 功能暂不可用；本地 FastAPI 运行方式仍见上文。`writer.huibara.cn` 自定义域名尚待绑定。
+当前线上首页是纯前端公众号排版器：粘贴普通文本或 Markdown 后可实时预览、切换主题/字体/字号，并复制富文本到公众号编辑器。排版过程不调用后端，文章内容不会上传或保存；主题设置仅保存在当前浏览器。当前部署不包含 FastAPI 后端，因此登录、选题管理、AI 生成和图片上传等 `/api/*` 功能仍不可用。本地完整 FastAPI 运行方式仍见上文。
