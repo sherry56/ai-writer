@@ -1,7 +1,6 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "ai-writer",
-  "account_id": "7e36c9335137a259db23d1261a10dbbc",
   "pages_build_output_dir": "./web/static",
   "compatibility_date": "2026-10-13"
 }
