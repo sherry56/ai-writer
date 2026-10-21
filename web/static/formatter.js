@@ -10,6 +10,7 @@
   const themes = ["default", "grace", "simple", "green"];
   const settingsKey = "ai-writer.formatter.settings";
   let toastTimer;
+  let savedRange = null;
 
   function readSettings() {
     try { return JSON.parse(localStorage.getItem(settingsKey) || "{}"); }
@@ -54,20 +55,58 @@
     })[char]);
   }
 
+  function sanitizeHtml(html, fallbackText = "") {
+    if (window.DOMPurify) return window.DOMPurify.sanitize(html, { ADD_ATTR: ["class", "style"] });
+    const plain = fallbackText || new DOMParser().parseFromString(html, "text/html").body.textContent || "";
+    return "<p>" + escapeHtml(plain).replace(/\r?\n/g, "<br>") + "</p>";
+  }
+
   function render() {
-    const text = input.value;
+    const text = input.innerText || "";
     wordCount.textContent = text.replace(/\s/g, "").length.toLocaleString("zh-CN") + " 字";
     if (!text.trim()) {
       preview.innerHTML = '<p class="preview-placeholder">文章预览会显示在这里</p>';
       return;
     }
 
-    const markdown = window.marked
+    preview.innerHTML = sanitizeHtml(input.innerHTML, text);
+  }
+
+  function rememberSelection() {
+    const selection = window.getSelection();
+    if (!selection || !selection.rangeCount) return;
+    const range = selection.getRangeAt(0);
+    if (input.contains(range.commonAncestorContainer)) savedRange = range.cloneRange();
+  }
+
+  function restoreSelection() {
+    input.focus();
+    if (!savedRange || !input.contains(savedRange.commonAncestorContainer)) return;
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(savedRange);
+  }
+
+  function runFormatCommand(command, value = null) {
+    restoreSelection();
+    document.execCommand(command, false, value);
+    rememberSelection();
+    render();
+  }
+
+  function pasteHtml(html) {
+    const safeHtml = sanitizeHtml(html);
+    restoreSelection();
+    document.execCommand("insertHTML", false, safeHtml);
+    rememberSelection();
+    render();
+  }
+
+  function pastePlainText(text) {
+    const html = window.marked
       ? window.marked.parse(text, { gfm: true, breaks: true })
       : "<p>" + escapeHtml(text).replace(/\r?\n/g, "<br>") + "</p>";
-    preview.innerHTML = window.DOMPurify
-      ? window.DOMPurify.sanitize(markdown, { ADD_ATTR: ["class"] })
-      : "<p>" + escapeHtml(text).replace(/\r?\n/g, "<br>") + "</p>";
+    pasteHtml(html);
   }
 
   const INLINE_PROPS = [
@@ -278,7 +317,7 @@
   }
 
   async function copyFormatted() {
-    if (!input.value.trim()) {
+    if (!(input.innerText || "").trim()) {
       showToast("先粘贴或输入文章内容");
       input.focus();
       return;
@@ -291,7 +330,7 @@
     try {
       result = makeOutput();
       const html = result.output.outerHTML;
-      const plain = preview.innerText || input.value;
+      const plain = preview.innerText || input.innerText;
       if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
         try {
           await navigator.clipboard.write([new ClipboardItem({
@@ -306,22 +345,51 @@
         result.stage.appendChild(result.output);
         if (!fallbackCopy(result.output)) throw new Error("当前浏览器不支持复制格式");
       }
-      showToast("已复制排版内容，可以粘贴到公众号编辑器");
+      showToast("已复制富文本，可以粘贴到公众号编辑器");
     } catch (error) {
       showToast("复制失败：" + error.message, 4500);
     } finally {
       if (result) result.stage.remove();
       button.disabled = false;
-      button.textContent = "复制排版内容";
+      button.textContent = "复制富文本";
     }
   }
 
   input.addEventListener("input", render);
+  input.addEventListener("keyup", rememberSelection);
+  input.addEventListener("mouseup", rememberSelection);
+  input.addEventListener("focus", rememberSelection);
+  input.addEventListener("paste", (event) => {
+    const clipboard = event.clipboardData;
+    if (!clipboard) return;
+    const html = clipboard.getData("text/html");
+    const plain = clipboard.getData("text/plain");
+    event.preventDefault();
+    if (html && html.trim()) pasteHtml(html);
+    else if (plain) pastePlainText(plain);
+  });
+  document.querySelectorAll(".format-button[data-command]").forEach((button) => {
+    button.addEventListener("mousedown", (event) => event.preventDefault());
+    button.addEventListener("click", () => runFormatCommand(button.dataset.command));
+  });
+  $("block-format").addEventListener("mousedown", rememberSelection);
+  $("block-format").addEventListener("change", (event) => {
+    const block = event.target.value;
+    runFormatCommand("formatBlock", block === "blockquote" ? "blockquote" : `<${block}>`);
+  });
+  $("btn-link").addEventListener("mousedown", (event) => event.preventDefault());
+  $("btn-link").addEventListener("click", () => {
+    restoreSelection();
+    const entered = window.prompt("输入链接地址");
+    if (!entered) return;
+    const href = /^(https?:|mailto:)/i.test(entered) ? entered : "https://" + entered;
+    runFormatCommand("createLink", href);
+  });
   themeSelect.addEventListener("change", applySettings);
   fontSelect.addEventListener("change", applySettings);
   sizeSelect.addEventListener("change", applySettings);
   $("btn-clear").addEventListener("click", () => {
-    input.value = "";
+    input.innerHTML = "";
     render();
     input.focus();
   });

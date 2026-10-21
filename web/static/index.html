@@ -6,8 +6,8 @@
   <title>公众号文章排版工具 | AI-Writer</title>
   <meta name="description" content="粘贴文章内容，选择排版样式，实时预览并复制到公众号编辑器。内容在本地浏览器处理。">
   <meta name="theme-color" content="#fffaf2" />
-  <link rel="icon" href="/static/favicon.svg?v=1" type="image/svg+xml" />
-  <link rel="stylesheet" href="/static/themes.css?v=26" />
+  <link rel="icon" href="/favicon.svg?v=1" type="image/svg+xml" />
+  <link rel="stylesheet" href="/themes.css?v=27" />
   <link rel="stylesheet" href="/formatter.css?v=1" />
   <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.11/dist/purify.min.js"></script>
@@ -57,7 +57,7 @@
         </label>
         <span class="toolbar-spacer"></span>
         <button id="btn-clear" class="button button-quiet" type="button">清空</button>
-        <button id="btn-copy" class="button button-primary" type="button">复制排版内容</button>
+        <button id="btn-copy" class="button button-primary" type="button">复制富文本</button>
       </section>
 
       <div class="workspace">
@@ -65,20 +65,35 @@
           <div class="panel-heading">
             <div>
               <h1 id="input-title">粘贴文章</h1>
-              <p>支持普通文本和 Markdown，预览会随输入即时更新。</p>
+              <p>可直接粘贴富文本，也可粘贴普通文本或 Markdown。</p>
             </div>
             <span class="panel-index">01</span>
           </div>
-          <textarea id="source-text" spellcheck="false" placeholder="# 在这里粘贴文章标题
-
-粘贴正文后，右侧会即时生成排版预览。
-
-## 小标题
-
-空一行即可分段；也支持 **加粗**、列表、引用和链接。"></textarea>
+          <div class="editor-toolbar" role="toolbar" aria-label="文字格式">
+            <button type="button" class="format-button" data-command="bold" title="加粗（Ctrl+B）"><strong>B</strong></button>
+            <button type="button" class="format-button" data-command="italic" title="斜体（Ctrl+I）"><em>I</em></button>
+            <button type="button" class="format-button" data-command="underline" title="下划线（Ctrl+U）"><u>U</u></button>
+            <span class="format-divider"></span>
+            <select id="block-format" aria-label="段落样式" title="段落样式">
+              <option value="p">正文</option>
+              <option value="h1">标题</option>
+              <option value="h2">二级标题</option>
+              <option value="h3">三级标题</option>
+              <option value="blockquote">引用</option>
+            </select>
+            <button type="button" class="format-button" data-command="insertUnorderedList" title="项目符号列表">• 列表</button>
+            <button type="button" class="format-button" data-command="insertOrderedList" title="编号列表">1. 列表</button>
+            <button type="button" id="btn-link" class="format-button" title="插入链接">链接</button>
+            <span class="format-divider"></span>
+            <button type="button" class="format-button" data-command="justifyLeft" title="左对齐">左</button>
+            <button type="button" class="format-button" data-command="justifyCenter" title="居中">中</button>
+            <button type="button" class="format-button" data-command="justifyRight" title="右对齐">右</button>
+            <button type="button" class="format-button format-clear" data-command="removeFormat" title="清除选中文字格式">清格式</button>
+          </div>
+          <div id="source-text" class="rich-editor" contenteditable="true" role="textbox" aria-label="文章内容" aria-multiline="true" data-placeholder="在这里粘贴或输入文章内容。&#10;&#10;可以保留从其他编辑器复制来的富文本格式，也可以使用上方工具栏编辑。"></div>
           <div class="input-footer">
             <span id="word-count">0 字</span>
-            <span>快捷键：Ctrl/⌘ + Enter 复制</span>
+            <span>快捷键：Ctrl/⌘ + Enter 复制排版</span>
           </div>
         </section>
 
@@ -99,7 +114,7 @@
       </div>
 
       <footer class="footer">
-        <span>粘贴内容 → 调整主题和字号 → 复制排版内容 → 粘贴到公众号</span>
+        <span>粘贴或编辑富文本 → 调整样式 → 复制富文本 → 粘贴到公众号</span>
         <span>AI-Writer 排版工具</span>
       </footer>
     </main>

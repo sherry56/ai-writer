@@ -26,7 +26,7 @@ button, select, textarea { font: inherit; }
 .toolbar { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; padding: 18px 0; }
 .control { display: grid; gap: 5px; color: var(--muted); font-size: 12px; }
 .control select { min-width: 110px; height: 36px; padding: 0 30px 0 10px; border: 1px solid var(--line); border-radius: 7px; background: white; color: var(--ink); font-size: 13px; }
-.control select:focus, textarea:focus { outline: 2px solid #dfb37c; outline-offset: 1px; }
+.control select:focus, .rich-editor:focus { outline: 2px solid #dfb37c; outline-offset: -2px; }
 .toolbar-spacer { flex: 1; }
 .button { height: 37px; padding: 0 15px; border: 1px solid var(--line); border-radius: 7px; background: white; color: #62564b; font-size: 13px; cursor: pointer; transition: .15s ease; }
 .button:hover { border-color: #d8b38b; color: var(--amber-dark); }
@@ -38,8 +38,19 @@ button, select, textarea { font: inherit; }
 .panel-heading h1, .panel-heading h2 { margin: 0; color: #3a3027; font-size: 15px; font-weight: 650; }
 .panel-heading p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
 .panel-index { color: #bda88d; font-size: 11px; font-variant-numeric: tabular-nums; }
-.input-panel textarea { flex: 1; width: 100%; min-height: 480px; padding: 22px; border: 0; resize: vertical; color: #38322d; background: transparent; font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; font-size: 14px; line-height: 1.8; }
-.input-panel textarea::placeholder { color: #b0a79c; }
+.editor-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; padding: 9px 12px; border-bottom: 1px solid #f2ece3; background: #fffdfa; }
+.format-button { min-width: 30px; height: 30px; padding: 0 8px; border: 1px solid transparent; border-radius: 5px; background: transparent; color: #62564b; font-size: 12px; cursor: pointer; }
+.format-button:hover, .format-button:focus-visible { border-color: #e7d7c3; background: #f8f1e8; color: var(--amber-dark); }
+.format-clear { margin-left: auto; color: #8f7860; }
+.format-divider { width: 1px; height: 20px; margin: 0 3px; background: #e9dfd3; }
+#block-format { height: 30px; max-width: 100px; padding: 0 5px; border: 1px solid var(--line); border-radius: 5px; background: white; color: #62564b; font-size: 12px; }
+.rich-editor { flex: 1; width: 100%; min-height: 460px; overflow: auto; padding: 22px; outline: none; color: #38322d; background: transparent; font-size: 14px; line-height: 1.8; word-break: break-word; }
+.rich-editor:empty::before { content: attr(data-placeholder); white-space: pre-wrap; color: #b0a79c; pointer-events: none; }
+.rich-editor p { margin: .5em 0; }
+.rich-editor h1, .rich-editor h2, .rich-editor h3 { margin: 1em 0 .5em; line-height: 1.45; }
+.rich-editor blockquote { margin: 1em 0; padding: 8px 14px; border-left: 3px solid #d5b48d; background: #faf6f0; color: #776957; }
+.rich-editor ul, .rich-editor ol { padding-left: 1.7em; }
+.rich-editor img { max-width: 100%; height: auto; }
 .input-footer { min-height: 43px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 20px; border-top: 1px solid #f2ece3; color: #94877a; font-size: 11px; }
 .preview-heading { flex-shrink: 0; }
 .live-indicator { display: inline-flex; align-items: center; gap: 7px; color: #77866e; font-size: 11px; white-space: nowrap; }
@@ -53,7 +64,7 @@ button, select, textarea { font: inherit; }
 @media (max-width: 900px) {
   .page { padding: 0 20px; }
   .workspace { grid-template-columns: 1fr; min-height: unset; }
-  .input-panel textarea { min-height: 390px; }
+  .rich-editor { min-height: 390px; }
   .preview-stage { min-height: 500px; }
 }
 @media (max-width: 560px) {
@@ -70,7 +81,9 @@ button, select, textarea { font: inherit; }
   .button { flex: 1; justify-content: center; padding: 0 9px; }
   .workspace { gap: 12px; }
   .panel-heading { min-height: 67px; padding: 13px 15px; }
-  .input-panel textarea { min-height: 300px; padding: 16px; font-size: 13px; }
+  .editor-toolbar { gap: 3px; padding: 7px 8px; }
+  .format-button { padding: 0 6px; }
+  .rich-editor { min-height: 300px; padding: 16px; font-size: 13px; }
   .input-footer { padding: 0 15px; }
   .preview-stage { min-height: 400px; padding: 12px; }
   .preview-stage .preview-wrap { padding: 18px 16px; }
